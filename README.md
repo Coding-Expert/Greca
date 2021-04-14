@@ -6,7 +6,7 @@ A new Flutter application.
 
 This project is a starting point for a Flutter application.
 
-![stack Overflow](https://github.com/Coding-Expert/Greca/login.png)
+![stack Overflow](https://github.com/Coding-Expert/Greca/blob/master/login.png)
 
 A few resources to get you started if this is your first Flutter project:
 
