@@ -8,6 +8,7 @@ This project is a starting point for a Flutter application.
 
 ![stack Overflow](https://github.com/Coding-Expert/Greca/blob/main/login.png)
 ![stack Overflow](https://github.com/Coding-Expert/Greca/blob/main/home.png)
+![stack Overflow](https://github.com/Coding-Expert/Greca/blob/main/balance.png)
 
 A few resources to get you started if this is your first Flutter project:
 
