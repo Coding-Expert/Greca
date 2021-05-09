@@ -43,6 +43,13 @@ dependencies:
   flutter_rounded_date_picker: 1.0.0
   flutter_typeahead: ^2.0.0
   toast: ^0.1.5
+  share: ^0.6.3+5
+  dio: ^3.0.0
+  path_provider: ^1.3.0
+  simple_permissions: 
+    git:
+      url: https://github.com/tq-systems/simple_permissions.git
+  file_utils: ^0.1.3
 
 
 dev_dependencies:

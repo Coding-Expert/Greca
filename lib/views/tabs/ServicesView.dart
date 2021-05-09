@@ -14,14 +14,19 @@ import 'package:greca/models/Country.dart';
 import 'package:greca/models/EuroTunnel.dart';
 import 'package:greca/models/Routes.dart';
 import 'package:greca/models/TempleteServiceModel.dart';
+import 'package:greca/models/TollModel.dart';
 import 'package:greca/models/TrainBooking.dart';
+import 'package:greca/models/TruckingService.dart';
 import 'package:greca/models/TunnelPass.dart';
 import 'package:greca/models/VehicleClassType.dart';
 import 'package:greca/models/VehicleEuroType.dart';
 import 'package:greca/models/VehicleManufactorer.dart';
 import 'package:greca/module/bridge_module.dart';
 import 'package:greca/module/euro_module.dart';
+import 'package:greca/module/toll_model.dart';
 import 'package:greca/module/train_module.dart';
+import 'package:greca/module/trucking_module.dart';
+import 'package:greca/module/tunnel_module.dart';
 import 'package:greca/module/user_module.dart';
 import 'package:greca/module/vehicle_module.dart';
 import 'package:provider/provider.dart';
@@ -31,8 +36,14 @@ import 'package:toast/toast.dart';
 
 class ServicesView extends StatefulWidget {
   int index;
+  bool order;
+  dynamic order_data;
 
-  ServicesView({this.index});
+  ServicesView({
+    this.index,
+    this.order,
+    this.order_data
+  });
 
   @override
   _ServicesViewState createState() => _ServicesViewState();
@@ -105,6 +116,11 @@ class _ServicesViewState extends State<ServicesView> {
   TextEditingController bridge_other = TextEditingController(text: "");
   TextEditingController vehicle_class_other = TextEditingController(text: "");
   TextEditingController vehicle_euro_class = TextEditingController(text: "");
+  TextEditingController from_trucking = TextEditingController(text: "");
+  TextEditingController to_trucking = TextEditingController(text: "");
+  TextEditingController comment_trucking = TextEditingController(text: "");
+  TextEditingController other_trucking = TextEditingController(text: "");
+
   bool from_flag = false;
   bool to_flag = false;
   bool vehicles_length_flag = false;
@@ -134,6 +150,12 @@ class _ServicesViewState extends State<ServicesView> {
   int truck_feature_id = 0;
   int id_direction_from = 0;
   int id_direction_to = 0;
+  List<TollModel> toll_list = [];
+  bool toll_flag = false;
+  List<TruckingService> trucking_list = [];
+  bool trucking_loading = false;
+  TruckingService selectedTruckingService;
+  String trucking_date;
 
   // List<Region> _dateService = new List();
   // final _jsonDate = JsonDecoder().convert('[{"label": "10-12-2021", "value": "10-12-2021", "selected": true},{"label": "10-12-2021", "value": "10-12-2021"}]');
@@ -150,6 +172,7 @@ class _ServicesViewState extends State<ServicesView> {
     if(service_date == null){
       service_date = DateTime.now().year.toString() + "-" + DateTime.now().month.toString() + "-" + DateTime.now().day.toString();
     }
+    trucking_date = DateTime.now().year.toString() + "-" + DateTime.now().month.toString() + "-" + DateTime.now().day.toString();
     // _dateService = (_jsonDate).map<Region>((item) => Region.fromJson(item)).toList();
     // selectedDateService = _dateService[0].label;
     // _vehicleNumber = (_jsonVehicleNumber).map<Region>((item) => Region.fromJson(item)).toList();
@@ -166,6 +189,12 @@ class _ServicesViewState extends State<ServicesView> {
     if(widget.index == 7){
       getBridgeInfo();
     }
+    if(widget.index == 6){
+      getTollInfo();
+    }
+    if(widget.index == 5){
+      getTruckingService();
+    }
     // _typeAheadController.addListener(() {
     //   print("value------:${_typeAheadController.text}");
       
@@ -176,6 +205,21 @@ class _ServicesViewState extends State<ServicesView> {
     print("$TAG Param index: ${widget.index}");
     print("$TAG Param index title: ${servicesName[widget.index]}");
     _setModel();
+  }
+
+  Future<void> getTruckingService() async {
+    trucking_loading = true;
+    trucking_list = [];
+    await TruckingModule.getTruckingService().then((value){
+      if(value.length > 0){
+        for(int i = 0; i < value.length; i++){
+          trucking_list.add(value[i]);
+        }
+      }
+      setState(() {
+        trucking_loading = false;
+      });
+    });
   }
   Future<void> getTrainInfo() async {
     await TrainModule.getFrom().then((value){
@@ -359,6 +403,20 @@ class _ServicesViewState extends State<ServicesView> {
     }
   }
 
+  Future<void> getTollInfo() async {
+    toll_flag = true;
+    await TollModule.getCountry().then((value){
+      if(value.length > 0){
+        for(int i = 0; i < value.length; i++){
+          toll_list.add(value[i]);
+        }
+      }
+      setState(() {
+        toll_flag = false;
+      });
+    });
+  }
+
   _setModel(){
     TempleteServiceModel value1 = new TempleteServiceModel();
     value1.index = widget.index;
@@ -421,7 +479,34 @@ class _ServicesViewState extends State<ServicesView> {
       builder: (context, provider, child){
         print("$TAG show provider services: ${provider.getIsShowServiceView}");
         print("$TAG int color: ${value}");
-        print("$TAG listServiceModel[0].colorBg: ${listServiceModel[0].colorBg}");
+        if(provider.getDashboradView == false && widget.order == true){
+          if(widget.order_data["id_port_from"] == 12 && widget.order_data["id_port_to"] == 13){
+            selectedEuroRoute = euroTunnel_routes[0];
+          }
+          if(widget.order_data["id_port_from"] == 13 && widget.order_data["id_port_to"] == 12){
+            selectedEuroRoute = euroTunnel_routes[1];
+          }
+          else{
+            if(widget.order_data["id_port_from"] == 20 || widget.order_data["id_port_from"] == 14 ){
+              selectedTunnel = tunnels[1];
+              if(widget.order_data["id_port_from"] == 20){
+                selectedRoute = routes[0];
+              }
+              else{
+                selectedRoute = routes[1];
+              }
+            if(widget.order_data["id_port_from"] == 19 || widget.order_data["id_port_from"] == 13){
+              selectedTunnel = tunnels[0];
+              if(widget.order_data["id_port_from"] == 13){
+                selectedRoute = routes[1];
+              }
+              else{
+                selectedRoute = routes[0];
+              }
+            }
+            }
+          }
+        }
         return Scaffold(
           backgroundColor: Color(value),
           body: Container(
@@ -447,7 +532,7 @@ class _ServicesViewState extends State<ServicesView> {
                     ),
                   ),
                 ),
-                _buildForm(getScreen),
+                _buildForm(provider, getScreen),
                 //back home
                 Align(
                   alignment: Alignment.topRight,
@@ -501,7 +586,7 @@ class _ServicesViewState extends State<ServicesView> {
                               ),
                               child: DropdownButtonHideUnderline(
                                 child: new DropdownButton<String>(
-                                  hint: new Text("Select Religion"),
+                                  hint: new Text("Select Region"),
                                   // value: selectedRegion,
                                   value: _region[0].label,
                                   isDense: true,
@@ -538,7 +623,7 @@ class _ServicesViewState extends State<ServicesView> {
                               ),
                               child: DropdownButtonHideUnderline(
                                 child: new DropdownButton<String>(
-                                  hint: new Text("Select Religion"),
+                                  hint: new Text("Select Region"),
                                   // value: selectedRegion,
                                   value: _region[0].label,
                                   isDense: true,
@@ -575,7 +660,7 @@ class _ServicesViewState extends State<ServicesView> {
                               ),
                               child: DropdownButtonHideUnderline(
                                 child: new DropdownButton<String>(
-                                  hint: new Text("Select Religion"),
+                                  hint: new Text("Select Region"),
                                   // value: selectedRegion,
                                   value: _region[0].label,
                                   isDense: true,
@@ -726,7 +811,7 @@ class _ServicesViewState extends State<ServicesView> {
     );
   }
 
-  Widget _buildForm(ScreenSize getScreen){
+  Widget _buildForm(MyProvider provider, ScreenSize getScreen){
     //Ferry
     if(widget.index==0){
       return SingleChildScrollView(
@@ -894,6 +979,7 @@ class _ServicesViewState extends State<ServicesView> {
     }
     //Train
     if(widget.index==2){
+      provider.setDashboardView = true;
       return from_flag == false && vehicles_length_flag == false && vehicle_type_flag == false && vehicle_regnum_flag == false ? Container(
           padding: EdgeInsets.only(top: (getScreen.getHeight()/2)-30.0, left: getScreen.getWidth() / 2),
           child: CircularProgressIndicator(valueColor: new AlwaysStoppedAnimation<Color>(Colors.red)),
@@ -956,7 +1042,7 @@ class _ServicesViewState extends State<ServicesView> {
                         DateTime newDateTime = await showRoundedDatePicker(
                         context: context,
                         initialDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
-                        firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day - 1),
+                        firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
                         lastDate: DateTime(DateTime.now().year + 1),
                         onTapDay: (DateTime dateTime, bool available) {
                           if (!available) {
@@ -1199,6 +1285,7 @@ class _ServicesViewState extends State<ServicesView> {
     }
     //Tunnel
     if(widget.index==3){
+      provider.setDashboardView = true;
       return vehicles_length_flag == false && vehicle_type_flag == false && vehicle_regnum_flag == false && euro_type_flag == true ? Container(
           padding: EdgeInsets.only(top: (getScreen.getHeight()/2)-30.0, left: getScreen.getWidth() / 2),
           child: CircularProgressIndicator(),
@@ -1330,7 +1417,7 @@ class _ServicesViewState extends State<ServicesView> {
                           DateTime newDateTime = await showRoundedDatePicker(
                           context: context,
                           initialDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
-                          firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day - 1),
+                          firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
                           lastDate: DateTime(DateTime.now().year + 1),
                           onTapDay: (DateTime dateTime, bool available) {
                             if (!available) {
@@ -1626,7 +1713,9 @@ class _ServicesViewState extends State<ServicesView> {
         );
     }
     //Eurotunnel
+    
     if(widget.index==4){
+      provider.setDashboardView = true;
       return vehicles_length_flag == false && vehicle_type_flag && vehicle_regnum_flag ? Container(
           padding: EdgeInsets.only(top: (getScreen.getHeight()/2)-30.0, left: getScreen.getWidth() / 2),
           child: CircularProgressIndicator(),
@@ -1702,7 +1791,7 @@ class _ServicesViewState extends State<ServicesView> {
                         DateTime newDateTime = await showRoundedDatePicker(
                         context: context,
                         initialDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
-                        firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day - 1),
+                        firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
                         lastDate: DateTime(DateTime.now().year + 1),
                         onTapDay: (DateTime dateTime, bool available) {
                           if (!available) {
@@ -1917,15 +2006,16 @@ class _ServicesViewState extends State<ServicesView> {
                             ListTile(
                               title: Text(route.route_name, style: TextStyle(color: Colors.white)),
                               trailing: IconButton(
-                                        icon: Icon(
-                                          Icons.delete,
-                                          color: Colors.white,
-                                        ),
-                                        onPressed: () {
-                                          setState(() {
-                                            selected_route_list.remove(route);
-                                          });
-                                        }),
+                                icon: Icon(
+                                  Icons.delete,
+                                  color: Colors.white,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    selected_route_list.remove(route);
+                                  });
+                                }
+                              ),
                             )
                         ],
                       )
@@ -1948,86 +2038,248 @@ class _ServicesViewState extends State<ServicesView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              SizedBox(height: 20.0,),
+              trucking_loading == true ? CircularProgressIndicator() : 
+                Container(
+                  color: Colors.black.withOpacity(0.8),
+                  padding: EdgeInsets.all(10),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 150,
+                        child: Text('Service Type', style:TextStyle(color: Colors.white, fontSize: 20)),
+                      ),
+                      SizedBox(width: 5),
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(5)
+                          ),
+                          child: DropdownButton(
+                            isExpanded: true,
+                            focusColor: Colors.white,
+                            dropdownColor: Colors.white,
+                            hint: Text(''),
+                            value: selectedTruckingService,
+                            onChanged: (newValue) {
+                              setState(() {
+                                selectedTruckingService = newValue;
+                              });
+                            },
+                            items: trucking_list.map((trucking) {
+                              return DropdownMenuItem(
+                                child: new Text(trucking.name),
+                                value: trucking,
+                              );
+                            }).toList(), 
+                              
+                          )
+                        )
+                      )
+                    ],
+                  )
+                  
+                ),
+              SizedBox(height: 20.0,),
+              selectedTruckingService != null && selectedTruckingService.trucking_type_id == -1 ?
+                Container(
+                  color: Colors.black.withOpacity(0.8),
+                  padding: EdgeInsets.all(10),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 150,
+                        child: Text('Other', style: TextStyle(
+                          fontSize: 20.0,
+                          color: Colors.white,
+                        ),),
+                      ),
+                      SizedBox(width: 5.0,),
+                      Expanded(
+                        child: Container(
+                          child: TextField(
+                            controller: other_trucking,
+                            decoration: InputDecoration(
+                              errorText: error,
+                              filled: true,
+                              fillColor: Colors.white,
+                              hintText: '',
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                                borderSide: BorderSide(color: Colors.white)
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                                borderSide: BorderSide(color: Colors.white)
+                              )
+                            ),
+                          )
+                        )
+                      ),
+                    ],
+                  ),
+                ) : Container(),
+              SizedBox(height: 20.0,),
               Container(
-                padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
-                  width: getScreen.getWidth(),
                 color: Colors.black.withOpacity(0.8),
-                child:
-                // Center(
-                //   child: Html(
-                //     data: """
-                //     <style>
-                //   .content {
-                //     max-width: auto;
-                //     margin: auto;
-                //   }
-                //   </style>
-                //   <body>
-                //   <div class="content">
-                //     <h2>OUR SUPPORT TRAM CAN OFFER YOU SOLUTIONS</h2>
-                //     <ul>
-                //       <li>&nbsp; Coffee</li>
-                //       <li>&nbsp; Tea</li>
-                //       <li>&nbsp; Milk</li>
-                //     </ul>
-                //     </div>
-                //   </body>
-                //   """,
-                //     style: {
-                //       "body": Style(
-                //         fontSize: FontSize(18.0),
-                //         fontWeight: FontWeight.bold,
-                //         color: Colors.white,
-                //       ),
-                //     },
-                //   ),
-                // ),
-                Column(
+                padding: EdgeInsets.all(10),
+                child: Row(
                   children: [
-                    Text("OUR SUPPORT TRAM CAN OFFER YOU SOLUTIONS", style: TextStyle(color: Colors.white, fontSize: 30.0),
-                      textAlign: TextAlign.center,),
-                    SizedBox(height: 17.0,),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.circle, color: Colors.white,),
-                        SizedBox(width: 20.0,),
-                        Flexible(
-                          child: Text("For any traction services for trucks and trailers", style: TextStyle(color: Colors.white, fontSize: 22.0),
-                            textAlign: TextAlign.start,),
-                        )
-                      ],
+                    Container(
+                      width: 150,
+                      child: Text('Date of Service', style: TextStyle(
+                        fontSize: 20.0,
+                        color: Colors.white,
+                      ),),
                     ),
-                    SizedBox(height: 10.0,),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.circle, color: Colors.white,),
-                        SizedBox(width: 20.0,),
-                        Flexible(
-                          child: Text("To gain secure access to various parking areas",
-                            style: TextStyle(color: Colors.white, fontSize: 22.0),
-                            textAlign: TextAlign.start,),
-                        )
-                      ],
+                    SizedBox(width: 5.0,),
+                    new IconButton(
+                      icon: Icon(
+                        Icons.calendar_today_outlined,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                      onPressed: () async {
+                        DateTime newDateTime = await showRoundedDatePicker(
+                        context: context,
+                        initialDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
+                        firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
+                        lastDate: DateTime(DateTime.now().year + 1),
+                        onTapDay: (DateTime dateTime, bool available) {
+                          if (!available) {
+                            showDialog(
+                                context: context,
+                                builder: (c) => CupertinoAlertDialog(title: Text("This date cannot be selected."),actions: <Widget>[
+                                  CupertinoDialogAction(child: Text("OK"),onPressed: (){
+                                    Navigator.pop(context);
+                                  },)
+                                ],));
+                          }
+                          return available;
+                        },
+                        borderRadius: 2,
+                        );
+                        if (newDateTime != null) {
+                          setState(() {
+                            trucking_date = newDateTime.year.toString() + "-" + newDateTime.month.toString() + "-" + newDateTime.day.toString();
+                          });
+                        }
+                    }),
+                    Expanded(
+                      child: Text(trucking_date, style: TextStyle(color: Colors.white, fontSize: 20)),
+                    )
+                  ]
+                )
+              ),
+              SizedBox(height: 20.0,),
+              Container(
+                color: Colors.black.withOpacity(0.8),
+                padding: EdgeInsets.all(10),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 150,
+                      child: Text('From location', style: TextStyle(
+                        fontSize: 20.0,
+                        color: Colors.white,
+                      ),),
                     ),
-                    SizedBox(height: 10.0,),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.circle, color: Colors.white,),
-                        SizedBox(width: 20.0,),
-                        Flexible(
-                          child: Text("In case of emergancey, the opportunity to contact with service stations areas",
-                            style: TextStyle(color: Colors.white, fontSize: 22.0),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 3,
-                            textAlign: TextAlign.start,),
+                    SizedBox(width: 5.0,),
+                    Expanded(
+                      child: Container(
+                        child: TextField(
+                          controller: from_trucking,
+                          decoration: InputDecoration(
+                            errorText: error,
+                            filled: true,
+                            fillColor: Colors.white,
+                            hintText: '',
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                              borderSide: BorderSide(color: Colors.white)
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                              borderSide: BorderSide(color: Colors.white)
+                            )
+                          ),
                         )
-                      ],
+                      )
                     ),
-                    SizedBox(height: 5.0,),
                   ],
+                ),
+              ),
+              SizedBox(height: 20.0,),
+              Container(
+                color: Colors.black.withOpacity(0.8),
+                padding: EdgeInsets.all(10),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 150,
+                      child: Text('To location', style: TextStyle(
+                        fontSize: 20.0,
+                        color: Colors.white,
+                      ),),
+                    ),
+                    SizedBox(width: 5.0,),
+                    Expanded(
+                      child: Container(
+                        child: TextField(
+                          controller: to_trucking,
+                          decoration: InputDecoration(
+                            errorText: error,
+                            filled: true,
+                            fillColor: Colors.white,
+                            hintText: '',
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                              borderSide: BorderSide(color: Colors.white)
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                              borderSide: BorderSide(color: Colors.white)
+                            )
+                          ),
+                        )
+                      )
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 20.0,),
+              Container(
+                width: double.infinity,
+                color: Colors.black.withOpacity(0.8),
+                padding: EdgeInsets.all(10),
+                child: Text('Comment', style: TextStyle(
+                  fontSize: 20.0,
+                  color: Colors.white,
+                ),),
+              ),
+              SizedBox(height: 10.0,),
+              Container(
+                width: double.infinity,
+                color: Colors.black.withOpacity(0.8),
+                padding: EdgeInsets.all(10),
+                child: TextField(
+                  controller: comment_trucking,
+                  decoration: InputDecoration(
+                    errorText: error,
+                    filled: true,
+                    fillColor: Colors.white,
+                    hintText: '',
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                      borderSide: BorderSide(color: Colors.white)
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                      borderSide: BorderSide(color: Colors.white)
+                    )
+                  ),
+                  maxLines: 5,
                 )
               ),
               SizedBox(height: 20.0,),
@@ -2039,22 +2291,50 @@ class _ServicesViewState extends State<ServicesView> {
     }
     //Tolls
     if(widget.index==6){
-      return SingleChildScrollView(
-        padding: EdgeInsets.only(top: (getScreen.getHeight()/2)-30.0),
-        child: Container(
-          color: Colors.tealAccent,
-          child: Column(
-            children: [
-              Text("TELEPASS", style: TextStyle(color: Colors.white, fontSize: 40.0,),),
-              SizedBox(height: 20.0,),
-              _buildMakeBooking(getScreen),
-            ],
+      provider.setDashboardView = true;
+      return Container(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(top: (getScreen.getHeight()/2)-70),
+          child: Container(
+            color: Colors.tealAccent,
+            child: Column(
+              children: [
+                //Text("TELEPASS", style: TextStyle(color: Colors.white, fontSize: 30.0,),),
+                //SizedBox(height: 10.0,),
+                toll_flag == true ? CircularProgressIndicator() :
+                  toll_list.length > 0 ?
+                    Container(
+                      width: double.infinity,
+                      height: 320,
+                      child: ListView.builder(
+                        itemCount: toll_list.length,
+                        itemBuilder: (BuildContext context, int index) {
+                          return new CheckboxListTile(
+                            title: new Text(toll_list[index].name, style: TextStyle(fontSize: 18.0, color: Colors.blueGrey),),
+                            value: toll_list[index].status,
+                            onChanged: (bool value) {
+                              setState(() {
+                                toll_list[index].status = value;
+                              });
+                            },
+                          );
+                        }
+                      ),
+                    ):
+                    Container(
+                      child: Text('No country'),
+                    ),
+                SizedBox(height: 20.0,),
+                _buildMakeBooking(getScreen),
+              ],
+            ),
           ),
-        ),
+        )
       );
     }
     //Bridge Pass
     if(widget.index == 7){
+      provider.setDashboardView = true;
       return bridge_flag == false && vehicles_length_flag == false && vehicle_type_flag == false && manufacturer_flag == true && country_flag == true ? Container(
           padding: EdgeInsets.only(top: (getScreen.getHeight()/2)-30.0, left: getScreen.getWidth() / 2),
           child: CircularProgressIndicator(),
@@ -2062,7 +2342,7 @@ class _ServicesViewState extends State<ServicesView> {
       :SingleChildScrollView(
         padding: EdgeInsets.only(top: (getScreen.getHeight()/2)-30.0),
         child: Container(
-          // color: Colors.amberAccent,
+            color: Colors.deepPurple,
           child: Column(
             children: [
               Container(
@@ -2151,7 +2431,7 @@ class _ServicesViewState extends State<ServicesView> {
                           DateTime newDateTime = await showRoundedDatePicker(
                           context: context,
                           initialDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
-                          firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day - 1),
+                          firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
                           lastDate: DateTime(DateTime.now().year + 1),
                           onTapDay: (DateTime dateTime, bool available) {
                             if (!available) {
@@ -2496,10 +2776,11 @@ class _ServicesViewState extends State<ServicesView> {
             ),
             child: DropdownButtonHideUnderline(
               child: new DropdownButton<String>(
-                hint: new Text("Select Religion"),
+                hint: new Text("Select Region"),
                 // value: selectedRegion,
                 value: _region[0].label,
                 isDense: true,
+                isExpanded: true,
                 onChanged: (String newValue) {
                   setState(() {
                     selectedRegion = newValue;
@@ -2554,14 +2835,14 @@ class _ServicesViewState extends State<ServicesView> {
 
   Widget _buildFromToFerry(ScreenSize getScreen){
     return Container(
-      padding: EdgeInsets.only(top: 10.0, bottom: 10.0),
+      padding: EdgeInsets.all(10.0),
       width: getScreen.getWidth(),
       color: Colors.transparent,
       child: Column(
         children: [
           //Form and To
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2587,8 +2868,8 @@ class _ServicesViewState extends State<ServicesView> {
                     ),
                     child: DropdownButtonHideUnderline(
                       child: new DropdownButton<String>(
-                        hint: new Text("Select Religion"),
-                        // value: selectedRegion,
+                        hint: new Text("Select Region"),
+                        isExpanded: true,
                         value: _region[0].label,
                         isDense: true,
                         onChanged: (String newValue) {
@@ -2611,7 +2892,7 @@ class _ServicesViewState extends State<ServicesView> {
                   ),
                 ],
               ),
-              SizedBox(width: 50.0,),
+              SizedBox(width: 25.0,),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -2636,8 +2917,8 @@ class _ServicesViewState extends State<ServicesView> {
                     ),
                     child: DropdownButtonHideUnderline(
                       child: new DropdownButton<String>(
-                        hint: new Text("Select Religion"),
-                        // value: selectedRegion,
+                        hint: new Text("Select Region"),
+                        isExpanded: true,
                         value: _region[0].label,
                         isDense: true,
                         onChanged: (String newValue) {
@@ -2665,119 +2946,75 @@ class _ServicesViewState extends State<ServicesView> {
           SizedBox(height: 10.0,),
           //Regis vehicle
           Container(
-            padding: EdgeInsets.only(left: 0.0, right: 0.0, bottom: 8.0, top: 9.0),
+            width: MediaQuery.of(context).size.width,
             child: Column(
               children: [
-                //Date
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Vehicle Registration Number',
-                          style: TextStyle(
-                            // decoration: TextDecoration.underline,
-                            fontSize: 17.0,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Container(
-                          width: ((getScreen.getWidth()/2.5)*2)+50.0,
-                          padding: EdgeInsets.all(10.0),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.withOpacity(0.5)),
-                            color: Colors.white,
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(5),
-                              bottom: Radius.circular(5),
-                            ),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: new DropdownButton<String>(
-                              hint: new Text("Select Date"),
-                              // value: selectedRegion,
-                              value: _region[0].label,
-                              isDense: true,
-                              onChanged: (String newValue) {
-                                setState(() {
-                                  selectedRegion = newValue;
-                                  // _region[0].label;
-                                });
-                                // print(selectedRegion);
-                                print("$TAG select dropdown: ${_region[0].label}");
-                              },
-                              items: _region.map((Region map) {
-                                return new DropdownMenuItem<String>(
-                                  value: map.label,
-                                  child: new Text(map.label,
-                                      style: new TextStyle(color: Colors.black)),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      'Vehicle Registration Number',
+                      style: TextStyle(
+                        // decoration: TextDecoration.underline,
+                        fontSize: 17.0,
+                        color: Colors.white,
+                      ),
                     ),
-                    // SizedBox(width: 50.0,),
-                    // Column(
-                    //   crossAxisAlignment: CrossAxisAlignment.start,
-                    //   children: [
-                    //     Text(
-                    //       'Date Services',
-                    //       style: TextStyle(
-                    //         // decoration: TextDecoration.underline,
-                    //         fontSize: 17.0,
-                    //         color: Colors.white,
-                    //       ),
-                    //     ),
-                    //     Container(
-                    //       width: getScreen.getWidth()/2.5,
-                    //       padding: EdgeInsets.all(10.0),
-                    //       decoration: BoxDecoration(
-                    //         border: Border.all(color: Colors.grey.withOpacity(0.5)),
-                    //         color: Colors.white,
-                    //         borderRadius: BorderRadius.vertical(
-                    //           top: Radius.circular(5),
-                    //           bottom: Radius.circular(5),
-                    //         ),
-                    //       ),
-                    //       child: DropdownButtonHideUnderline(
-                    //         child: new DropdownButton<String>(
-                    //           hint: new Text("Select Religion"),
-                    //           // value: selectedRegion,
-                    //           value: _region[0].label,
-                    //           isDense: true,
-                    //           onChanged: (String newValue) {
-                    //             setState(() {
-                    //               selectedRegion = newValue;
-                    //               _region[0].label;
-                    //             });
-                    //             // print(selectedRegion);
-                    //             print("$TAG select dropdown: ${_region[0].label}");
-                    //           },
-                    //           items: _region.map((Region map) {
-                    //             return new DropdownMenuItem<String>(
-                    //               value: map.label,
-                    //               child: new Text(map.label,
-                    //                   style: new TextStyle(color: Colors.black)),
-                    //             );
-                    //           }).toList(),
-                    //         ),
-                    //       ),
-                    //     ),
-                    //   ],
-                    // ),
+                    Container(
+                      child: TypeAheadFormField(
+                        textFieldConfiguration: TextFieldConfiguration(
+                          controller: this._typeAheadController,
+                          decoration: InputDecoration(
+                            labelText: 'Registration Number',
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          textCapitalization: TextCapitalization.characters,
+                          onChanged: (content){
+                            setState(() {
+                              selected_truck_num = content;
+                              veh_length_state = true;
+                              veh_type_state = true;
+                            });
+                          }
+                        ),          
+                        onSuggestionSelected: (suggestion) {
+                          this._typeAheadController.text = suggestion;
+                          selected_truck_num = suggestion;
+                          VehicleModule.changeTruckInfo(UserModule.user.sessId, suggestion).then((json){
+                            setState(() {
+                              changeTruckState(json);
+                            });
+                          });
+                        }, 
+                        itemBuilder: (context, suggestion) {
+                          return ListTile(
+                            title: Text(suggestion),
+                          );
+                        },
+                        suggestionsCallback: (pattern) {
+                          return getSuggestions(pattern);
+                        },
+                        transitionBuilder: (context, suggestionsBox, controller) {
+                          return suggestionsBox;
+                        },
+                        validator: (value) {
+                          if (value.isEmpty) {
+                            return 'Please select a number';
+                          }
+                        },
+                        onSaved: (value) => this._selectedCity = value,
+                      ),
+                    ),
                   ],
                 ),
-                SizedBox(height: 10.0,),
               ],
             ),
           ),
+          SizedBox(height: 10.0,),
           //Length and Type Vehicle
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2803,7 +3040,7 @@ class _ServicesViewState extends State<ServicesView> {
                     ),
                     child: DropdownButtonHideUnderline(
                       child: new DropdownButton<String>(
-                        hint: new Text("Select Religion"),
+                        hint: new Text("Select Region"),
                         // value: selectedRegion,
                         value: _region[0].label,
                         isDense: true,
@@ -2852,7 +3089,7 @@ class _ServicesViewState extends State<ServicesView> {
                     ),
                     child: DropdownButtonHideUnderline(
                       child: new DropdownButton<String>(
-                        hint: new Text("Select Religion"),
+                        hint: new Text("Select Region"),
                         // value: selectedRegion,
                         value: _region[0].label,
                         isDense: true,
@@ -3019,7 +3256,7 @@ class _ServicesViewState extends State<ServicesView> {
                     ),
                     child: DropdownButtonHideUnderline(
                       child: new DropdownButton<String>(
-                        hint: new Text("Select Religion"),
+                        hint: new Text("Select Region"),
                         // value: selectedRegion,
                         value: _region[0].label,
                         isDense: true,
@@ -3068,7 +3305,7 @@ class _ServicesViewState extends State<ServicesView> {
                     ),
                     child: DropdownButtonHideUnderline(
                       child: new DropdownButton<String>(
-                        hint: new Text("Select Religion"),
+                        hint: new Text("Select Region"),
                         // value: selectedRegion,
                         value: _region[0].label,
                         isDense: true,
@@ -3188,7 +3425,7 @@ class _ServicesViewState extends State<ServicesView> {
                 ),
                 child: DropdownButtonHideUnderline(
                   child: new DropdownButton(
-                    hint: new Text("Select Religion"),
+                    hint: new Text("Select Region"),
                     value: selected_from,
                     //value: from_region[0],
                     isDense: true,
@@ -3256,7 +3493,7 @@ class _ServicesViewState extends State<ServicesView> {
                 ),
                 child: DropdownButtonHideUnderline(
                   child: new DropdownButton(
-                    hint: new Text("Select Religion"),
+                    hint: new Text("Select Region"),
                     value: selected_to,
                     isDense: true,
                     onChanged: (String newValue) {
@@ -3372,7 +3609,7 @@ class _ServicesViewState extends State<ServicesView> {
       }
     }
   }
-  onMakeBooking() {
+  onMakeBooking() async {
     if(widget.index == 3){    //tunnel
       String json_data = jsonEncode({
         "PHPSESSID" : UserModule.user.sessId,
@@ -3395,6 +3632,23 @@ class _ServicesViewState extends State<ServicesView> {
 
       });
       print("---json data:${json_data}");
+      TunnelModule.onBooking(json_data).then((value) {
+        if(value == 200){
+          Toast.show("Booking has proceed susscessfully", context);
+          setState(() {
+            selectedTunnel = null;
+            selectedRoute = null;
+            cross_date = DateTime.now().year.toString() + "-" + DateTime.now().month.toString() + "-" + DateTime.now().day.toString();
+            this._typeAheadController.text = "";
+            selectedVeh_length = null;
+            selectedVeh_type = null;
+            selectedVeh_class_type = null;
+            vehicle_class_other.text = "";
+            selectedEuro_veh_type = null;
+            notes.text = "";
+          });
+        }
+      });
     }
     if(widget.index == 4){    //Euro
       TruckRoute truck_route;
@@ -3423,8 +3677,23 @@ class _ServicesViewState extends State<ServicesView> {
 
       });
       print("---json data:${json_data}");
+      EuroModule.onBooking(json_data).then((value){
+        if(value == 200){
+          setState(() {
+            Toast.show("Booking has proceed susscessfully", context);
+            selectedEuroRoute = null;
+            euro_cross_date = DateTime.now().year.toString() + "-" + DateTime.now().month.toString() + "-" + DateTime.now().day.toString();
+            this._typeAheadController.text = "";
+            selectedVeh_length = null;
+            selectedVeh_type = null;
+            euro_tunnel_meter.text = "";
+            euro_notes.text = "";
+          });
+        }
+      });
     }
     if(widget.index == 7){    //bridge
+      
       String json_data = jsonEncode({
         "PHPSESSID" : UserModule.user.sessId,
         "id_bridge": selectedBridge.id_bridge,
@@ -3453,8 +3722,28 @@ class _ServicesViewState extends State<ServicesView> {
 
       });
       print("---json data:${json_data}");
+      BridgeModule.onBooking(json_data).then((value){
+        if(value == 200){
+          setState(() {
+            Toast.show("Booking has proceed susscessfully", context);
+            selectedBridge = null;
+            bridge_other.text = "";
+            bridge_date = DateTime.now().year.toString() + "-" + DateTime.now().month.toString() + "-" + DateTime.now().day.toString();
+            this._typeAheadController.text = "";
+            selectedVeh_length = null;
+            selectedVeh_type = null;
+            selected_manufacturer = null;
+            vehicle_model.text = "";
+            vehicle_color.text = "";
+            selected_country = null;
+            selectedEuroClass = "";
+            euro_notes.text = "";
+          });
+        }
+      });
     }
-    if(widget.index == 2){
+    if(widget.index == 2){    //train
+      
       String port_name_from = selected_from.split(',')[0];
       String country_name_from = selected_from.split(' ')[1];
       int port_id_from; int country_id_from;
@@ -3555,6 +3844,30 @@ class _ServicesViewState extends State<ServicesView> {
         }
       });
       
+    }
+    if(widget.index == 6){                      ///// Toll
+      List<Map<String, dynamic>> send_data = [];
+      if(toll_list.length > 0){
+        for(int i = 0; i < toll_list.length; i++){
+          if(toll_list[i].status == true){
+            send_data.add(toll_list[i].toJson());
+          }
+        }
+      }
+      if(send_data.length > 0){
+        await TollModule.onBooking(send_data).then((value){
+          if(value != ""){
+            Toast.show("Toll data sent", context);
+          }
+        });
+      }
+    }
+    if(widget.index == 5){
+      await TruckingModule.onBooking(selectedTruckingService.trucking_type_id, other_trucking.text, trucking_date, from_trucking.text, to_trucking.text, comment_trucking.text).then((value){
+        if(value == "success"){
+          Toast.show("Booking Trucking Service", context);
+        }
+      });
     }
   }
 

@@ -11,6 +11,14 @@ import 'package:greca/views/tabs/home/PricesView.dart';
 import 'package:greca/views/tabs/home/ProfileView.dart';
 
 class HomeView extends StatefulWidget {
+
+  bool last_order;
+
+  HomeView({
+    Key key,
+    this.last_order
+  }) : super(key: key);
+
   @override
   _HomeViewState createState() => _HomeViewState();
 }
@@ -19,20 +27,24 @@ class _HomeViewState extends State<HomeView> {
   String TAG = "HomeView ===>";
 
   DateTime currentBackPressTime;
-
   int currentTabIndex = 4;
 
-  List<Widget> tabs = [
-    OrdersView(),
-    PricesView(),
-    BalanceView(),
-    ProfileView(),
-    DashboardView(),
-  ];
+  List<Widget> tabs = [];
+    // OrdersView(order: widget.last_order),
+    // PricesView(order: widget.last_order),
+    // BalanceView(order: widget.last_order),
+    // ProfileView(order: widget.last_order),
+    // DashboardView(order: widget.last_order),
+
 
   @override
   void initState() {
     super.initState();
+    tabs.add(OrdersView());
+    tabs.add(PricesView());
+    tabs.add(BalanceView());
+    tabs.add(ProfileView());
+    tabs.add(DashboardView(order: widget.last_order));
     print("$TAG initState running...");
   }
 
@@ -42,6 +54,7 @@ class _HomeViewState extends State<HomeView> {
   }
 
   onTapped(int index) {
+    
     setState(() {
       currentTabIndex = index;
     });

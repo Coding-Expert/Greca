@@ -186,14 +186,14 @@ class _AssistentViewState extends State<AssistentView> {
     if(status){
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => HomeView()),
+        MaterialPageRoute(builder: (context) => HomeView(last_order: status)),
             (Route<dynamic> route) => false,
       );
     }
     else{
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => HomeView()),
+        MaterialPageRoute(builder: (context) => HomeView(last_order: status)),
             (Route<dynamic> route) => false,
       );
     }

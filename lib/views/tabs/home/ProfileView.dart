@@ -3,6 +3,13 @@ import 'package:greca/helpers/ScreenSize.dart';
 import 'package:greca/views/LoginView.dart';
 
 class ProfileView extends StatefulWidget {
+
+  bool order;
+
+  ProfileView({
+    Key key,
+    this.order
+  }) : super(key: key);
   @override
   _ProfileViewState createState() => _ProfileViewState();
 }

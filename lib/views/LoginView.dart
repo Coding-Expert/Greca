@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:toast/toast.dart';
 import 'package:greca/connections/PostApi.dart';
 import 'package:greca/helpers/ScreenSize.dart';
@@ -29,6 +30,31 @@ class _LoginViewState extends State<LoginView> {
 
   PostApi _postApi = new PostApi();
 
+  bool _obscureText = true;
+  bool remember_flag = false;
+
+  void _toggle(){
+    setState(() {
+      _obscureText = !_obscureText;
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    getUserInfo();
+  }
+
+  Future<void> getUserInfo() async {
+    SharedPreferences pref = await SharedPreferences.getInstance();
+    String user_name = pref.getString("user_name");
+    String password = pref.getString("password");
+    if(user_name != null && password != null){
+      inputUserName.text = user_name;
+      inputPassword.text = password;
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +79,8 @@ class _LoginViewState extends State<LoginView> {
                 width: getScreen.getWidth(),
                 padding: EdgeInsets.only(top: (getScreen.getHeight()/5), bottom: 20.0, left: pLeft, right: pRight),
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     //Image.asset("assets/icons/logo.png"),
                     SvgPicture.asset(
@@ -68,7 +96,7 @@ class _LoginViewState extends State<LoginView> {
                           ),
                           border: new OutlineInputBorder(
                               borderSide: new BorderSide(color: Colors.white)),
-                          hintText: 'type usesrname',
+                          hintText: 'type username',
                           hintStyle: TextStyle(color: Colors.white),
                           labelText: 'Username',
                           labelStyle: TextStyle(color: Colors.white),
@@ -82,6 +110,7 @@ class _LoginViewState extends State<LoginView> {
                     ),
                     SizedBox(height: 20.0,),
                     TextField(
+                      obscureText: _obscureText,
                       controller: inputPassword,
                       decoration: new InputDecoration(
                           focusedBorder: OutlineInputBorder(
@@ -100,7 +129,7 @@ class _LoginViewState extends State<LoginView> {
                           prefixText: ' ',
                           suffixIcon: InkWell(
                             onTap: (){
-
+                              _toggle();
                             },
                             child: Icon(
                               Icons.remove_red_eye,
@@ -110,9 +139,28 @@ class _LoginViewState extends State<LoginView> {
                           suffixStyle: const TextStyle(color: Colors.white)),
                       style: TextStyle(color: Colors.white),
                     ),
+                    
                     SizedBox(height: 35.0,),
                     //Login
                     _btnLogin(getScreen),
+                    SizedBox(height: 50.0,),
+                    Container(
+                      width: 200,
+                      child: Theme(
+                        data: ThemeData(unselectedWidgetColor: Colors.white),
+                        child: CheckboxListTile(
+                          title: Text("Remember Me", style: TextStyle(color: Colors.white)),
+                          value: remember_flag, 
+                          onChanged: (value){
+                            setState(() {
+                              remember_flag = value;
+                            });
+                          },
+                          controlAffinity: ListTileControlAffinity.leading,
+                          // contentPadding: EdgeInsets.all(0),
+                        )
+                      )
+                    ),
                   ],
                 ),
               )
@@ -196,16 +244,30 @@ class _LoginViewState extends State<LoginView> {
       }
       else{
         var data = json.decode(response);
-        UserModule.createUser(data);
-        
-        // SharedPreferences pref = await SharedPreferences.getInstance();
-        // pref.setString(Const.KEY_PREF_TOKEN, data['login']);
-        print("user data---------:${data.toString()}");
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => AssistentView()),
-              (Route<dynamic> route) => false,
-        );
+        if(data["loginError"] == "Username or password is wrong!"){
+          Toast.show("Username or password is wrong!", context);
+          setState(() {
+            isLoading = false;
+          });
+          return;
+        }
+        else {
+          if(remember_flag) {
+            SharedPreferences pref = await SharedPreferences.getInstance();
+            pref.setString("user_name", inputUserName.text.toString());
+            pref.setString("password", inputPassword.text.toString());
+          }
+          UserModule.createUser(data);
+          
+          // SharedPreferences pref = await SharedPreferences.getInstance();
+          // pref.setString(Const.KEY_PREF_TOKEN, data['login']);
+          print("user data---------:${data.toString()}");
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => HomeView()),
+                (Route<dynamic> route) => false,
+          );
+        }
       }
     });
 

@@ -2,10 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:greca/helpers/MyProvider.dart';
 import 'package:greca/helpers/ScreenSize.dart';
+import 'package:greca/module/orders_module.dart';
 import 'package:greca/views/tabs/ServicesView.dart';
 import 'package:provider/provider.dart';
 
 class DashboardView extends StatefulWidget {
+
+  bool order;
+
+  DashboardView({
+    Key key,
+    this.order
+  }) : super(key: key);
+
   @override
   _DashboardViewState createState() => _DashboardViewState();
 }
@@ -15,11 +24,12 @@ class _DashboardViewState extends State<DashboardView> {
 
   // bool showServiceView = false;
   int _index = 0;
+  bool _order = true;
+  dynamic order_data;
 
   @override
   void initState() {
     super.initState();
-    print("$TAG initState  running");
   }
 
   @override
@@ -29,6 +39,9 @@ class _DashboardViewState extends State<DashboardView> {
       create: (context) => MyProvider(),
       child: Consumer<MyProvider>(
         builder: (context, provider, child){
+          if(!provider.getDashboradView && widget.order == true){
+            goLastOrder(provider, widget.order);
+          }
           print("$TAG show provider dashboard: ${provider.getIsShowServiceView}");
           return Stack(
             children: [
@@ -62,7 +75,7 @@ class _DashboardViewState extends State<DashboardView> {
                   ),
                 ),
               ),
-              if(provider.getIsShowServiceView)ServicesView(index: _index,)
+              if(provider.getIsShowServiceView)ServicesView(index: _index, order: widget.order)
             ],
           );
         },
@@ -240,6 +253,58 @@ class _DashboardViewState extends State<DashboardView> {
           ],
         ),
       );
+    }
+  }
+
+  void goLastOrder(MyProvider provider, bool order_status) {
+    
+    if(order_status){
+      OrdersModule.getLastOrders().then((value) {
+        if(value["single_service"] == 1){
+          if(value["single_service_type"] == 6){
+            setState(() {
+              order_data = value;
+              provider.setIsShowServiceView = true;
+              _index = 2;
+            });
+          }
+          if(value["id_port_from"] == 12 && value["id_port_to"] == 13){
+            setState(() {
+              order_data = value;
+              provider.setIsShowServiceView = true;
+              _index = 4;
+            });
+          }
+          if(value["id_port_from"] == 13 && value["id_port_to"] == 12){
+            setState(() {
+              order_data = value;
+              provider.setIsShowServiceView = true;
+              _index = 4;
+            });
+          }
+          else if(value["id_port_from"] == 13 || value["id_port_from"] == 20 || value["id_port_from"] == 14 || value["id_port_from"] == 19){
+            setState(() {
+              order_data = value;
+              provider.setIsShowServiceView = true;
+              _index = 3;
+            });
+          }
+          if(value["single_service_type"] == 20){
+            setState(() {
+              order_data = value;
+              provider.setIsShowServiceView = true;
+              _index = 7;
+            });
+          }
+          if(value["single_service_type"] == 18){
+            setState(() {
+              order_data = value;
+              provider.setIsShowServiceView = true;
+              _index = 6;
+            });
+          }
+        }
+      });
     }
   }
 

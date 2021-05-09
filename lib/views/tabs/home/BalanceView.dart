@@ -1,14 +1,32 @@
+import 'dart:io';
 import 'dart:math';
 
+import 'package:dio/dio.dart';
+import 'package:file_utils/file_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:greca/helpers/MyProvider.dart';
 import 'package:greca/helpers/ScreenSize.dart';
 import 'package:greca/models/BalanceModel.dart';
+import 'package:greca/models/Charge.dart';
+import 'package:greca/models/TransInfo.dart';
+import 'package:greca/models/Transaction.dart';
+import 'package:greca/module/balance_module.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:responsive_table/responsive_table.dart';
+import 'package:share/share.dart';
+import 'package:simple_permissions/simple_permissions.dart';
+import 'package:toast/toast.dart';
 
 class BalanceView extends StatefulWidget {
+
+  bool order;
+
+  BalanceView({
+    Key key,
+    this.order
+  }) : super(key: key);
   @override
   _BalanceViewState createState() => _BalanceViewState();
 }
@@ -23,6 +41,9 @@ class _BalanceViewState extends State<BalanceView> {
 
   String idTable = "";
   String customerTable = "";
+  String inv_filename;
+  Permission permission1 = Permission.WriteExternalStorage;
+  bool downloading = false;
 
   List<BalanceModel> listBalance = new List();
 
@@ -116,6 +137,9 @@ class _BalanceViewState extends State<BalanceView> {
   bool _sortAscending = true;
   bool _isLoading = true;
   bool _showSelect = true;
+  Transaction transaction; 
+  Charge charge;
+  bool trans_loading = false;
 
   List<Map<String, dynamic>> _generateData({int n: 10}) {
     final List source = List.filled(n, Random.secure());
@@ -156,9 +180,22 @@ class _BalanceViewState extends State<BalanceView> {
   void initState() {
     super.initState();
     print("$TAG initState running...");
-    _initData();
+    trans_loading = true;
+    getChargeList();
+    // _initData();
   }
-
+  Future<void> getChargeList() async {
+    await BalanceModule.getTransaction().then((value){
+      if(value != null){
+        transaction = BalanceModule.transaction;
+        charge = BalanceModule.charge;
+      }
+      setState(() {
+        trans_loading = false;
+      });
+      
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -172,8 +209,10 @@ class _BalanceViewState extends State<BalanceView> {
             body: Stack(
               children: [
                 if(provider.getIsShowOrderView)MainOrdersView(getScreen, provider),
-                if(!provider.getIsShowOrderView)SecondOrdersView(getScreen, provider),
-                if(isShowOption)OptionView(getScreen, provider),
+                if(!provider.getIsShowOrderView)
+                  downloading == true ? loadingWidget(getScreen, provider) :
+                  SecondOrdersView(getScreen, provider),
+                // if(isShowOption)OptionView(getScreen, provider),
                 //Menu
                 if(getScreen.getWidth()>790)Align(
                   alignment: Alignment.topRight,
@@ -267,6 +306,26 @@ class _BalanceViewState extends State<BalanceView> {
       ),
     );
   }
+  Widget loadingWidget(ScreenSize getScreen, MyProvider provider) {
+    return Container(
+      child: new Stack(
+        children: [
+          SecondOrdersView(getScreen, provider),
+          new Positioned(
+            child: Container(
+              alignment: AlignmentDirectional.center,
+              child: Container(
+                child: CircularProgressIndicator(),
+              ),
+            ),
+            top: MediaQuery.of(context).size.height / 2 - 100,
+            left: MediaQuery.of(context).size.width / 2,
+          )
+          
+        ],
+      ),
+    );
+  }
 
   Widget MainOrdersView(ScreenSize screenSize, MyProvider provider){
     return SingleChildScrollView(
@@ -308,8 +367,8 @@ class _BalanceViewState extends State<BalanceView> {
                       ),
                     ),
                   ),
-                  SizedBox(width: 20.0,),
-                  Text("CUSTOMER", style: TextStyle(fontSize: 20.0, color: Colors.white),),
+                  // SizedBox(width: 20.0,),
+                  // Text("CUSTOMER", style: TextStyle(fontSize: 20.0, color: Colors.white),),
                 ],
               ),
             ),
@@ -328,12 +387,12 @@ class _BalanceViewState extends State<BalanceView> {
                       textColor: Colors.white,
                       padding: EdgeInsets.all(8.0),
                       onPressed: () {
-                        if(!isTransaction){
+                        // if(!isTransaction){
                           setState(() {
                             isTransaction = true;
-                            return;
+                            // return;
                           });
-                        }
+                        // }
                       },
                       child: Text(
                         "Based on Transactions",
@@ -357,12 +416,12 @@ class _BalanceViewState extends State<BalanceView> {
                       textColor: Colors.white,
                       padding: EdgeInsets.all(8.0),
                       onPressed: () {
-                        if(isTransaction){
+                        // if(isTransaction){
                           setState(() {
                             isTransaction = false;
-                            return;
+                            // return;
                           });
-                        }
+                        // }
                       },
                       child: Text(
                         "Based on Charges",
@@ -376,13 +435,17 @@ class _BalanceViewState extends State<BalanceView> {
                 ],
               ),
             ),
-            if(screenSize.getWidth()<750)Expanded(
-              child: ListView.builder(
-                  itemCount: 50,
-                  itemBuilder: (context, index){
-                    return _buildList(context, index, screenSize, provider);
-                  }
-              ),
+            if(screenSize.getWidth()<750)
+              trans_loading == true ? CircularProgressIndicator(
+                valueColor: new AlwaysStoppedAnimation<Color>(Colors.red)
+              ) :
+              Expanded(
+                child:ListView.builder(
+                    itemCount: isTransaction == true ? transaction.trans_info.length : charge.charge_info.length,
+                    itemBuilder: (context, index){
+                      return _buildList(context, index, screenSize, provider);
+                    }
+                ),
             ),
             if(screenSize.getWidth()>750)Expanded(
               child: Container(
@@ -487,6 +550,13 @@ class _BalanceViewState extends State<BalanceView> {
             color: Colors.transparent,
             child: InkWell(
               onTap: (){
+                provider.isTransShow = isTransaction;
+                if(isTransaction){
+                  provider.seleted_transaction = transaction.trans_info[index];
+                }
+                else{
+                  provider.selected_charge = charge.charge_info[index];
+                }
                 provider.setIsShowOrderView = false;
               },
               child: Container(
@@ -518,8 +588,8 @@ class _BalanceViewState extends State<BalanceView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text("Name $index", style: TextStyle(color: Colors.white, fontSize: 23.0),),
-                        Text("User ID $index", style: TextStyle(color: Colors.white, fontSize: 16.0),),
+                        Text(isTransaction == true ? transaction.trans_info[index].client != null ? transaction.trans_info[index].client : "xxx" : charge.charge_info[index].client != null ? charge.charge_info[index].client : "xxx", style: TextStyle(color: Colors.white, fontSize: 23.0),),
+                        Text(isTransaction == true ? transaction.trans_info[index].ref_number != null ? transaction.trans_info[index].ref_number : "xxx" : charge.charge_info[index].ref_number != null ? charge.charge_info[index].ref_number : "xxx", style: TextStyle(color: Colors.white, fontSize: 16.0),),
                       ],
                     ),
                   ],
@@ -553,7 +623,7 @@ class _BalanceViewState extends State<BalanceView> {
                   //crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Text("Customer: ", style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold, color: Colors.white),),
-                    Text("Name", style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold, color: Colors.white),),
+                    Text(isTransaction == true ? provider.seleted_transaction.client : provider.selected_charge.client, style: TextStyle(fontSize: 20.0, fontWeight: FontWeight.bold, color: Colors.white),),
                   ],
                 )
                     : Container(),
@@ -701,6 +771,7 @@ class _BalanceViewState extends State<BalanceView> {
                 child: InkWell(
                   onTap: (){
                     provider.setIsShowOrderView = true;
+                    downloadFile(provider);
                   },
                   child: Container(
                     decoration: BoxDecoration(
@@ -727,6 +798,7 @@ class _BalanceViewState extends State<BalanceView> {
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: (){
+                     onShare(provider);
                   },
                   child: Container(
                     decoration: BoxDecoration(
@@ -743,7 +815,7 @@ class _BalanceViewState extends State<BalanceView> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Icon(Icons.insert_drive_file, color: Colors.white, size: 30.0,),
-                        Text("Title", style: TextStyle(color: Colors.white),),
+                        Text("Invoice", style: TextStyle(color: Colors.white),),
                       ],
                     ),
                   ),
@@ -767,12 +839,16 @@ class _BalanceViewState extends State<BalanceView> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text("Customer", style: TextStyle(fontSize: 15.0, color: Colors.black.withOpacity(0.6)),),
-                    Text("Margareta", style: TextStyle(fontSize: 25.0, fontWeight: FontWeight.bold, color: Colors.black),),
+                    Text(isTransaction == true ? provider.seleted_transaction.client : provider.selected_charge.client, style: TextStyle(fontSize: 25.0, fontWeight: FontWeight.bold, color: Colors.black),),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text("Company: ", style: TextStyle(fontSize: 15.0, color: Colors.black.withOpacity(0.6)),),
-                        Text("Greca.inc", style: TextStyle(fontSize:15.0, fontWeight: FontWeight.bold, color: Colors.black),),
+                        Flexible(
+                          child: Text("Company: ", style: TextStyle(fontSize: 15.0, color: Colors.black.withOpacity(0.6))),
+                        ),
+                        Flexible(
+                          child: Text(isTransaction == true ? provider.seleted_transaction.company != null ? provider.seleted_transaction.company : "xxx" : provider.selected_charge.company != null ? provider.selected_charge.company : "xxx", style: TextStyle(fontSize:15.0, fontWeight: FontWeight.bold, color: Colors.black),maxLines:2,textAlign: TextAlign.center),
+                        )
                       ],
                     )
                   ],
@@ -802,7 +878,7 @@ class _BalanceViewState extends State<BalanceView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text("Report Number:", style: TextStyle(fontSize: 15.0, color: Colors.black.withOpacity(0.6)),),
-                        Text("R-N 0001", style: TextStyle(fontSize: 17.0, color: Colors.black),),
+                        Text(isTransaction == true ? provider.seleted_transaction.report_number != null ? provider.seleted_transaction.report_number: "xxx" : provider.selected_charge.report_number != null ? provider.selected_charge.report_number : "xxx", style: TextStyle(fontSize: 17.0, color: Colors.black),),
                       ],
                     ),
                   ],
@@ -817,7 +893,7 @@ class _BalanceViewState extends State<BalanceView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text("Departure Date:", style: TextStyle(fontSize: 15.0, color: Colors.black.withOpacity(0.6)),),
-                        Text("2020-12-12", style: TextStyle(fontSize: 17.0, color: Colors.black),),
+                        Text(isTransaction == true ? provider.seleted_transaction.ddate : provider.selected_charge.ddate, style: TextStyle(fontSize: 17.0, color: Colors.black),),
                       ],
                     ),
                   ],
@@ -833,7 +909,7 @@ class _BalanceViewState extends State<BalanceView> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text("Debit", style: TextStyle(fontSize: 15.0, color: Colors.black.withOpacity(0.6)),),
-                          Text("120.000", style: TextStyle(fontSize: 17.0, color: Colors.black),),
+                          Text(isTransaction == true ? provider.seleted_transaction.debit : provider.selected_charge.debit, style: TextStyle(fontSize: 17.0, color: Colors.black),),
                         ],
                       ),
                     ),
@@ -844,7 +920,7 @@ class _BalanceViewState extends State<BalanceView> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text("Credit", style: TextStyle(fontSize: 15.0, color: Colors.black.withOpacity(0.6)),),
-                          Text("20.000", style: TextStyle(fontSize: 17.0, color: Colors.black),),
+                          Text(isTransaction == true ? provider.seleted_transaction.credit : provider.selected_charge.credit, style: TextStyle(fontSize: 17.0, color: Colors.black),),
                         ],
                       ),
                     ),
@@ -861,7 +937,7 @@ class _BalanceViewState extends State<BalanceView> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text("Ref Number", style: TextStyle(fontSize: 15.0, color: Colors.black.withOpacity(0.6)),),
-                          Text("REF-28471283", style: TextStyle(fontSize: 17.0, color: Colors.black),),
+                          Text(isTransaction == true ? provider.seleted_transaction.ref_number != null ? provider.seleted_transaction.ref_number : "xxx" : provider.selected_charge.ref_number != null ? provider.selected_charge.ref_number : "xxx", style: TextStyle(fontSize: 17.0, color: Colors.black),),
                         ],
                       ),
                     ),
@@ -872,7 +948,7 @@ class _BalanceViewState extends State<BalanceView> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text("Booking Code", style: TextStyle(fontSize: 15.0, color: Colors.black.withOpacity(0.6)),),
-                          Text("BC-421648962", style: TextStyle(fontSize: 17.0, color: Colors.black),),
+                          Text(isTransaction == true ? provider.seleted_transaction.booking_code != null ? provider.seleted_transaction.booking_code : "xxx" : "xxx", style: TextStyle(fontSize: 17.0, color: Colors.black),),
                         ],
                       ),
                     ),
@@ -900,7 +976,7 @@ class _BalanceViewState extends State<BalanceView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text("Descriptions:", style: TextStyle(color: Colors.red.withOpacity(0.6), fontSize: 17.0),),
-                      Text("Keep safety and be fast!", style: TextStyle(color: Colors.black, fontSize: 17.0),),
+                      Text(isTransaction == true ? provider.seleted_transaction.description != null ? provider.seleted_transaction.description : "xxx" : provider.selected_charge.description != null ? provider.selected_charge.description : "xxx", style: TextStyle(color: Colors.black, fontSize: 17.0),),
                     ],
                   )
                 ),
@@ -912,7 +988,76 @@ class _BalanceViewState extends State<BalanceView> {
     );
   }
 
+  void onShare(MyProvider provider) {
+    String inv_filename;
+    if(isTransaction == true){
+      inv_filename = provider.seleted_transaction.inv_filename;
+      
+    }
+    else{
+      inv_filename = provider.selected_charge.inv_filename;
+    }
+    if(inv_filename == null){
+      Toast.show("No invoice file", context);
+      return;
+    }
+    Share.shareFiles([
+        inv_filename                
+      ]
+    );
+    
+  }
 
+  Future<void> downloadFile(MyProvider provider) async {
+    String inv_filename;
+    if(isTransaction == true){
+      inv_filename = provider.seleted_transaction.inv_filename;
+      
+    }
+    else{
+      inv_filename = provider.selected_charge.inv_filename;
+    }
+    if(inv_filename == null){
+      Toast.show("No invoice file", context);
+      return;
+    }
+    String file_name = inv_filename.substring(inv_filename.lastIndexOf("/") + 1, inv_filename.length);
+    String file_extension = inv_filename.substring(inv_filename.lastIndexOf(".") + 1, inv_filename.length);
+    Dio dio = Dio();
+    bool checkPermission1 =
+        await SimplePermissions.checkPermission(permission1);
+    // print(checkPermission1);
+    if (checkPermission1 == false) {
+      await SimplePermissions.requestPermission(permission1);
+      checkPermission1 = await SimplePermissions.checkPermission(permission1);
+    }
+    if (checkPermission1 == true) {
+      String dirloc = "";
+      if (Platform.isAndroid) {
+        dirloc = "/sdcard/download/";
+      } else {
+        dirloc = (await getApplicationDocumentsDirectory()).path;
+      }
+      try {
+        FileUtils.mkdir([dirloc]);
+        await dio.download(inv_filename, dirloc + file_name + "." + file_extension,
+            onReceiveProgress: (receivedBytes, totalBytes) {
+          setState(() {
+            downloading = true;
+          });
+          
+        });
+      } catch (e) {
+        print(e);
+      }
+      setState(() {
+        downloading = false;
+        print("----download complete------");
+      });
+    } else {
+      
+    }
+  }
 
   Widget tick1() {
     return Column(

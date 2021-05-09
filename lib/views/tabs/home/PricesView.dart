@@ -8,6 +8,12 @@ import 'package:provider/provider.dart';
 import 'package:responsive_table/responsive_table.dart';
 
 class PricesView extends StatefulWidget {
+  bool order;
+
+  PricesView({
+    Key key,
+    this.order
+  }) : super(key: key);
   @override
   _PricesViewState createState() => _PricesViewState();
 }
