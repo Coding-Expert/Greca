@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 // import 'package:flutter_html/flutter_html.dart';
@@ -11,7 +13,17 @@ import 'package:greca/helpers/MyStyle.dart';
 import 'package:greca/helpers/ScreenSize.dart';
 import 'package:greca/models/Bridge.dart';
 import 'package:greca/models/Country.dart';
+import 'package:greca/models/EnglishMessina.dart';
 import 'package:greca/models/EuroTunnel.dart';
+import 'package:greca/models/FerryFrom.dart';
+import 'package:greca/models/FerryRegion.dart';
+import 'package:greca/models/FerryRoute.dart';
+import 'package:greca/models/FerryTo.dart';
+import 'package:greca/models/LongBridgeFrom.dart';
+import 'package:greca/models/LongBridgeRoute.dart';
+import 'package:greca/models/LongBridgeTo.dart';
+import 'package:greca/models/MessinaRoute.dart';
+import 'package:greca/models/OrderDetail.dart';
 import 'package:greca/models/Routes.dart';
 import 'package:greca/models/TempleteServiceModel.dart';
 import 'package:greca/models/TollModel.dart';
@@ -20,9 +32,13 @@ import 'package:greca/models/TruckingService.dart';
 import 'package:greca/models/TunnelPass.dart';
 import 'package:greca/models/VehicleClassType.dart';
 import 'package:greca/models/VehicleEuroType.dart';
+import 'package:greca/models/VehicleLength.dart';
 import 'package:greca/models/VehicleManufactorer.dart';
 import 'package:greca/module/bridge_module.dart';
+import 'package:greca/module/english_messina_module.dart';
 import 'package:greca/module/euro_module.dart';
+import 'package:greca/module/ferry_module.dart';
+import 'package:greca/module/longbridge_module.dart';
 import 'package:greca/module/toll_model.dart';
 import 'package:greca/module/train_module.dart';
 import 'package:greca/module/trucking_module.dart';
@@ -37,12 +53,12 @@ import 'package:toast/toast.dart';
 class ServicesView extends StatefulWidget {
   int index;
   bool order;
-  dynamic order_data;
+  OrderDetail order_detail;
 
   ServicesView({
     this.index,
     this.order,
-    this.order_data
+    this.order_detail
   });
 
   @override
@@ -58,9 +74,10 @@ class _ServicesViewState extends State<ServicesView> {
     "TRAIN SERVICES",
     "TUNNEL PASS",
     "EUROTUNNEL PASS",
-    "TRUCKING",
+    "English | Messina",
     "ROAD TOLL",
-    "BRIDGE PASS"
+    "BRIDGE PASS",
+    "TRUCKING"
     ];
 
   bool _storebaeltBridge = false;
@@ -120,6 +137,9 @@ class _ServicesViewState extends State<ServicesView> {
   TextEditingController to_trucking = TextEditingController(text: "");
   TextEditingController comment_trucking = TextEditingController(text: "");
   TextEditingController other_trucking = TextEditingController(text: "");
+  TextEditingController euro_mrn = TextEditingController(text: "");
+  TextEditingController euro_grm = TextEditingController(text: "");
+  final ScrollController _scrollController = ScrollController();
 
   bool from_flag = false;
   bool to_flag = false;
@@ -127,13 +147,20 @@ class _ServicesViewState extends State<ServicesView> {
   bool vehicle_type_flag = false;
   bool vehicle_regnum_flag = false;
   final TextEditingController _typeAheadController = TextEditingController();
+  final TextEditingController trailerController = TextEditingController();
   String _selectedCity;
   List<String> suggest_list;
+  List<String> trailer_suggest_list;
   bool veh_length_state = true;
   bool veh_type_state = true;
+  bool trailer_veh_length_state = true;
+  bool trailer_veh_type_state = true;
   // ignore: non_constant_identifier_names
   List<TruckRoute> selected_route_list = [];
   String selected_truck_num;
+  String selected_trailer_num;
+  String trailer_selectedVeh_length;
+  String trailer_selectedVeh_type;
   bool class_type_flag = false;
   bool euro_type_flag = false;
   List<VehicleEuroType> vehicles_euro_type = [];
@@ -156,14 +183,41 @@ class _ServicesViewState extends State<ServicesView> {
   bool trucking_loading = false;
   TruckingService selectedTruckingService;
   String trucking_date;
-
-  // List<Region> _dateService = new List();
-  // final _jsonDate = JsonDecoder().convert('[{"label": "10-12-2021", "value": "10-12-2021", "selected": true},{"label": "10-12-2021", "value": "10-12-2021"}]');
-  // String selectedDateService;
-  //
-  // List<Region> _vehicleNumber = new List();
-  // final _jsonVehicleNumber = JsonDecoder().convert('[{"label": "GK - 1", "value": "GK - 1", "selected": true},{"label": "GK - 2", "value": "GK - 1"}]');
-  // String selectedVehicleNumber;
+  List<FerryRegion> ferry_region_list = [];
+  bool ferry_region_loading = false;
+  FerryRegion selected_ferry_region;
+  List<FerryFrom> ferry_from_list = [];
+  bool ferry_from_loading = false;
+  FerryFrom selected_ferry_from;
+  List<FerryTo> ferry_to_list = [];
+  bool ferry_to_loading = false;
+  FerryTo selected_ferry_to;
+  String ferry_date;
+  List<FerryRoute> selected_ferry_route_list = [];
+  bool empty_flag = false;
+  String attach_file;
+  String file_extension;
+  String file_name;
+  List<PlatformFile> mrn_files = [];
+  List<PlatformFile> grm_files = [];
+  String longbridge_date;
+  bool longbridge_from_loading = false;
+  List<LongBridgeFrom> longbridge_fromList = [];
+  LongBridgeFrom selected_longbridge_from;
+  bool longbridge_to_loading = false;
+  List<LongBridgeTo> longbridge_toList = [];
+  LongBridgeTo selected_longbridge_to;
+  String longbridge_date1;
+  String longbridge_date2;
+  List<VehicleLength> long_bridge_vehicles_length = [];
+  VehicleLength selected_longbridge_vehicleLength;
+  List<LongBridgeRoute> selected_longbridgeroute_list = [];
+  List<String> english_messina = [];
+  String selected_english_messina;
+  List<EnglishMessina> second_location_list = [];
+  EnglishMessina selected_second_location;
+  String enlgish_messina_date;
+  List<MessinaRoute> selected_messina_route_list = [];
 
   @override
   void initState() {
@@ -173,10 +227,14 @@ class _ServicesViewState extends State<ServicesView> {
       service_date = DateTime.now().year.toString() + "-" + DateTime.now().month.toString() + "-" + DateTime.now().day.toString();
     }
     trucking_date = DateTime.now().year.toString() + "-" + DateTime.now().month.toString() + "-" + DateTime.now().day.toString();
-    // _dateService = (_jsonDate).map<Region>((item) => Region.fromJson(item)).toList();
-    // selectedDateService = _dateService[0].label;
-    // _vehicleNumber = (_jsonVehicleNumber).map<Region>((item) => Region.fromJson(item)).toList();
-    // selectedVehicleNumber = _vehicleNumber[0].label;
+    ferry_date = DateTime.now().year.toString() + "-" + DateTime.now().month.toString() + "-" + DateTime.now().day.toString();
+    cross_date = DateTime.now().year.toString() + "-" + DateTime.now().month.toString() + "-" + DateTime.now().day.toString();
+    euro_cross_date = DateTime.now().year.toString() + "-" + DateTime.now().month.toString() + "-" + DateTime.now().day.toString();
+    bridge_date = DateTime.now().year.toString() + "-" + DateTime.now().month.toString() + "-" + DateTime.now().day.toString();
+    longbridge_date1 = DateTime.now().year.toString() + "-" + DateTime.now().month.toString() + "-" + DateTime.now().day.toString();
+    longbridge_date2 = DateTime.now().year.toString() + "-" + DateTime.now().month.toString() + "-" + DateTime.now().day.toString();
+    enlgish_messina_date = DateTime.now().year.toString() + "-" + DateTime.now().month.toString() + "-" + DateTime.now().day.toString();
+
     if(widget.index == 2){
       getTrainInfo();
     }
@@ -192,8 +250,17 @@ class _ServicesViewState extends State<ServicesView> {
     if(widget.index == 6){
       getTollInfo();
     }
-    if(widget.index == 5){
+    if(widget.index == 8){
       getTruckingService();
+    }
+    if(widget.index == 0){
+      getFerryInfo();
+    }
+    if(widget.index == 1){
+      getLongBridgeInfo();
+    }
+    if(widget.index == 5){
+      getEnglishMessinaInfo();
     }
     // _typeAheadController.addListener(() {
     //   print("value------:${_typeAheadController.text}");
@@ -205,6 +272,134 @@ class _ServicesViewState extends State<ServicesView> {
     print("$TAG Param index: ${widget.index}");
     print("$TAG Param index title: ${servicesName[widget.index]}");
     _setModel();
+  }
+
+  Future<void> getEnglishMessinaInfo() async {
+    english_messina.add("English-channel");
+    english_messina.add("Straits of Messina");
+
+    await VehicleModule.getVeh_Length().then((value){
+      setState(() {
+        vehicles_length_flag = true;
+        if(VehicleModule.vehLength_list.length > 0){
+          for(int i = 0; i < VehicleModule.vehLength_list.length; i++){
+            vehicles_length.add(VehicleModule.vehLength_list[i].truck_feature_category);
+          }
+        }
+      });
+    });
+    await VehicleModule.getVeh_Type().then((value){
+      setState(() {
+        vehicle_type_flag = true;
+        if(VehicleModule.vehType_list.length > 0){
+          for(int i = 0; i < VehicleModule.vehType_list.length; i++){
+            vehicles_type.add(VehicleModule.vehType_list[i].name);
+          }
+        }
+      });
+      
+    });
+    await VehicleModule.getVeh_RegNum().then((value){
+      setState(() {
+        vehicle_regnum_flag = true;
+      });
+    });
+  }
+
+  Future<void> getFerryInfo() async {
+    ferry_region_loading = true;
+    await FerryModule.getFerryRegion().then((value) {
+      if(value.length > 0){
+        for(int i = 0; i < value.length; i++){
+          ferry_region_list.add(value[i]);
+        }
+      }
+      setState(() {
+        ferry_region_loading = false;
+      });
+    });
+    await VehicleModule.getVeh_Length().then((value){
+      setState(() {
+        vehicles_length_flag = true;
+        if(VehicleModule.vehLength_list.length > 0){
+          for(int i = 0; i < VehicleModule.vehLength_list.length; i++){
+            vehicles_length.add(VehicleModule.vehLength_list[i].truck_feature_category);
+          }
+        }
+      });
+    });
+    await VehicleModule.getVeh_Type().then((value){
+      setState(() {
+        vehicle_type_flag = true;
+        if(VehicleModule.vehType_list.length > 0){
+          for(int i = 0; i < VehicleModule.vehType_list.length; i++){
+            vehicles_type.add(VehicleModule.vehType_list[i].name);
+          }
+        }
+      });
+      
+    });
+    await VehicleModule.getVeh_RegNum().then((value){
+      setState(() {
+        vehicle_regnum_flag = true;
+      });
+    });
+  }
+
+  Future<void> getLongBridgeInfo() async {
+    longbridge_from_loading = true;
+    await LongBridgeModule.getLongBridgeFrom().then((value){
+      if(value.length > 0){
+        for(int i = 0; i < value.length; i++){
+          longbridge_fromList.add(value[i]);
+        }
+      }
+      setState(() {
+        longbridge_from_loading = false;
+      });
+    });
+    await VehicleModule.getVeh_Length().then((value){
+      setState(() {
+        vehicles_length_flag = true;
+        if(VehicleModule.vehLength_list.length > 0){
+          for(int i = 0; i < VehicleModule.vehLength_list.length; i++){
+            vehicles_length.add(VehicleModule.vehLength_list[i].truck_feature_category);
+          }
+        }
+      });
+    });
+    await VehicleModule.getVeh_Type().then((value){
+      setState(() {
+        vehicle_type_flag = true;
+        if(VehicleModule.vehType_list.length > 0){
+          for(int i = 0; i < VehicleModule.vehType_list.length; i++){
+            vehicles_type.add(VehicleModule.vehType_list[i].name);
+          }
+        }
+      });
+      
+    });
+    await VehicleModule.getVeh_RegNum().then((value){
+      setState(() {
+        vehicle_regnum_flag = true;
+      });
+    });
+  }
+
+  Future<void> getLongBridgeTo(int id) async {
+    longbridge_to_loading = true;
+    longbridge_toList = [];
+    await LongBridgeModule.getLongBridgeTo(id).then((value){
+      if(value.length > 0){
+        for(int i = 0; i < value.length; i++){
+          
+          longbridge_toList.add(value[i]);
+        }
+      }
+      setState(() {
+        longbridge_to_loading = false;
+      });
+    });
   }
 
   Future<void> getTruckingService() async {
@@ -220,6 +415,7 @@ class _ServicesViewState extends State<ServicesView> {
         trucking_loading = false;
       });
     });
+    
   }
   Future<void> getTrainInfo() async {
     await TrainModule.getFrom().then((value){
@@ -450,9 +646,12 @@ class _ServicesViewState extends State<ServicesView> {
       clrBg = Colors.amberAccent;
     }
     if(widget.index==5){
-      strImg = "assets/images/Trucking.jpg";
-      strIcon = "assets/icons/07trucking.png";
-      clrBg = Colors.lime;
+      // strImg = "assets/images/Trucking.jpg";
+      // strIcon = "assets/icons/07trucking.png";
+      // clrBg = Colors.lime;
+      strImg = "assets/images/Eurotunnel.jpg";
+      strIcon = "assets/icons/04eurotunnel.png";
+      clrBg = Colors.amberAccent;
     }
     if(widget.index==6){
       strImg = "assets/images/Tolls.jpg";
@@ -463,6 +662,11 @@ class _ServicesViewState extends State<ServicesView> {
       strImg = "assets/images/Bridge.jpg";
       strIcon = "assets/icons/05bridges.png";
       clrBg = Colors.deepPurple;
+    }
+    if(widget.index==8){
+      strImg = "assets/images/Trucking.jpg";
+      strIcon = "assets/icons/07trucking.png";
+      clrBg = Colors.lime;
     }
     value1.imageAsset = strImg;
     value1.colorBg = clrBg;
@@ -478,26 +682,26 @@ class _ServicesViewState extends State<ServicesView> {
     return Consumer<MyProvider>(
       builder: (context, provider, child){
         print("$TAG show provider services: ${provider.getIsShowServiceView}");
-        print("$TAG int color: ${value}");
-        if(provider.getDashboradView == false && widget.order == true){
-          if(widget.order_data["id_port_from"] == 12 && widget.order_data["id_port_to"] == 13){
+        print("$TAG orderDetail: ${widget.order_detail}");
+        if(widget.order_detail != null){
+          if(widget.order_detail.id_port_from == 12 && widget.order_detail.id_port_to == 13){
             selectedEuroRoute = euroTunnel_routes[0];
           }
-          if(widget.order_data["id_port_from"] == 13 && widget.order_data["id_port_to"] == 12){
+          if(widget.order_detail.id_port_from == 13 && widget.order_detail.id_port_to == 12){
             selectedEuroRoute = euroTunnel_routes[1];
           }
           else{
-            if(widget.order_data["id_port_from"] == 20 || widget.order_data["id_port_from"] == 14 ){
+            if(widget.order_detail.id_port_from == 20 || widget.order_detail.id_port_to == 14 ){
               selectedTunnel = tunnels[1];
-              if(widget.order_data["id_port_from"] == 20){
+              if(widget.order_detail.id_port_from == 20){
                 selectedRoute = routes[0];
               }
               else{
                 selectedRoute = routes[1];
               }
-            if(widget.order_data["id_port_from"] == 19 || widget.order_data["id_port_from"] == 13){
+            if(widget.order_detail.id_port_from == 19 || widget.order_detail.id_port_to == 13){
               selectedTunnel = tunnels[0];
-              if(widget.order_data["id_port_from"] == 13){
+              if(widget.order_detail.id_port_from == 13){
                 selectedRoute = routes[1];
               }
               else{
@@ -814,6 +1018,7 @@ class _ServicesViewState extends State<ServicesView> {
   Widget _buildForm(MyProvider provider, ScreenSize getScreen){
     //Ferry
     if(widget.index==0){
+      provider.setDashboardView = true;
       return SingleChildScrollView(
         padding: EdgeInsets.only(top: (getScreen.getHeight()/2)-30.0),
         child: Container(
@@ -864,112 +1069,602 @@ class _ServicesViewState extends State<ServicesView> {
           color: Colors.deepPurple,
           child: Column(
             children: [
-              // Container(
-              //   padding: EdgeInsets.only(top: 10.0, bottom: 10.0),
-              //   width: getScreen.getWidth(),
-              //   color: Colors.black.withOpacity(0.8),
-              //   child: Row(
-              //     mainAxisAlignment: MainAxisAlignment.center,
-              //     children: [
-              //       Text('Storebaelt Bridge', style: TextStyle(
-              //           fontSize: 23.0,
-              //           color: Colors.white,
-              //         ),),
-              //       SizedBox(width: 60.0,),
-              //       Theme(
-              //         data: Theme.of(context).copyWith(
-              //           unselectedWidgetColor: Colors.white,
-              //         ),
-              //         child: Checkbox(
-              //             value: _storebaeltBridge,
-              //             activeColor: Colors.green,
-              //             hoverColor: Colors.white,
-              //             focusColor: Colors.white,
-              //             checkColor: Colors.white,
-              //             onChanged: (value){
-              //               setState(() {
-              //                 _storebaeltBridge = value;
-              //               });
-              //             }
-              //         ),
-              //       ),
-              //
-              //     ],
-              //   ),
-              // ),
-              SizedBox(height: 0.0,),
-              // Container(
-              //   padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
-              //   width: getScreen.getWidth(),
-              //   color: Colors.black.withOpacity(0.8),
-              //   child: Row(
-              //     mainAxisAlignment: MainAxisAlignment.center,
-              //     children: [
-              //       Text('Resund Bridge', style: TextStyle(
-              //         fontSize: 23.0,
-              //         color: Colors.white,
-              //       ),),
-              //       SizedBox(width: 60.0,),
-              //       Container(
-              //         width: getScreen.getOrientation()== Orientation.portrait?140.0:200.0,
-              //         height: 30.0,
-              //         child: FlatButton(
-              //           shape: RoundedRectangleBorder(
-              //               borderRadius: BorderRadius.circular(28.0),
-              //               side: BorderSide(color: Colors.white)),
-              //           color: Colors.transparent,
-              //           textColor: Colors.white,
-              //           padding: EdgeInsets.only(top: 3.0, bottom: 3.0, left: 15.0, right: 15.0),
-              //           onPressed: () {
-              //             print("$TAG Choose: ${listServiceModel[0].title}");
-              //           },
-              //           child: Text(
-              //             "Choose",
-              //             style: TextStyle(
-              //                 fontSize: 20.0,
-              //                 fontWeight: FontWeight.bold
-              //             ),
-              //           ),
-              //         ),
-              //       ),
-              //     ],
-              //   ),
-              // ),
-              SizedBox(height: 0.0,),
-              // Container(
-              //   padding: EdgeInsets.only(top: 10.0, bottom: 10.0,),
-              //   width: getScreen.getWidth(),
-              //   color: Colors.black.withOpacity(0.8),
-              //   child: Row(
-              //     mainAxisAlignment: MainAxisAlignment.center,
-              //     children: [
-              //       Text('Dartford Crossing', style: TextStyle(
-              //         fontSize: 23.0,
-              //         color: Colors.white,
-              //       ),),
-              //       SizedBox(width: 60.0,),
-              //       Theme(
-              //         data: Theme.of(context).copyWith(
-              //           unselectedWidgetColor: Colors.white,
-              //         ),
-              //         child: Checkbox(
-              //             value: _dartfordCrossing,
-              //             activeColor: Colors.green,
-              //             hoverColor: Colors.white,
-              //             focusColor: Colors.white,
-              //             checkColor: Colors.white,
-              //             onChanged: (value){
-              //               setState(() {
-              //                 _dartfordCrossing = value;
-              //               });
-              //             }
-              //         ),
-              //       ),
-              //
-              //     ],
-              //   ),
-              // ),
-              _buildFromToFerry(getScreen),
+              Container(
+                padding: EdgeInsets.all(10.0),
+                width: getScreen.getWidth(),
+                color: Colors.transparent,
+                child: Column(
+                  children: [
+                    //Form and To
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'From',
+                              style: TextStyle(
+                                // decoration: TextDecoration.underline,
+                                fontSize: 17.0,
+                                color: Colors.white,
+                              ),
+                            ),
+                            longbridge_from_loading == true ? CircularProgressIndicator(valueColor: new AlwaysStoppedAnimation<Color>(Colors.red))
+                              :Container(
+                                width: getScreen.getWidth()/2.5,
+                                padding: EdgeInsets.all(10.0),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey.withOpacity(0.5)),
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.vertical(
+                                    top: Radius.circular(5),
+                                    bottom: Radius.circular(5),
+                                  ),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: new DropdownButton(
+                                    hint: new Text("Select from"),
+                                    isExpanded: true,
+                                    value: selected_longbridge_from,
+                                    isDense: true,
+                                    onChanged: (newValue) {
+                                      setState(() {
+                                        selected_longbridge_from = newValue;
+                                        getLongBridgeTo(selected_longbridge_from.port_id);
+                                      });
+                                    },
+                                    items: longbridge_fromList.map((from) {
+                                      return DropdownMenuItem(
+                                        value: from,
+                                        child: new Text(from.name,
+                                            style: new TextStyle(color: Colors.black)),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        SizedBox(width: 25.0,),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'To',
+                              style: TextStyle(
+                                // decoration: TextDecoration.underline,
+                                fontSize: 17.0,
+                                color: Colors.white,
+                              ),
+                            ),
+                            longbridge_to_loading == true ? CircularProgressIndicator(valueColor: new AlwaysStoppedAnimation<Color>(Colors.red))
+                              :Container(
+                                width: getScreen.getWidth()/2.5,
+                                padding: EdgeInsets.all(10.0),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey.withOpacity(0.5)),
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.vertical(
+                                    top: Radius.circular(5),
+                                    bottom: Radius.circular(5),
+                                  ),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: new DropdownButton(
+                                    hint: new Text("Select To"),
+                                    isExpanded: true,
+                                    value: selected_longbridge_to,
+                                    isDense: true,
+                                    onChanged: (newValue) {
+                                      setState(() {
+                                        selected_longbridge_to = newValue;
+                                      });
+                                    },
+                                    items: longbridge_toList.map((to) {
+                                      return new DropdownMenuItem(
+                                        value: to,
+                                        child: new Text(to.name,
+                                            style: new TextStyle(color: Colors.black)),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              ),
+                            ],
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 10.0,),
+                    Container(
+                      width: MediaQuery.of(context).size.width,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 150,
+                            child: Text(selected_longbridge_from == null ? 'Date of service' : 'Date of service ' + selected_longbridge_from.name, style: TextStyle(
+                              fontSize: 20.0,
+                              color: Colors.white,
+                            ),),
+                          ),
+                          SizedBox(width: 5.0,),
+                          new IconButton(
+                            icon: Icon(
+                              Icons.calendar_today_outlined,
+                              color: Colors.white,
+                              size: 32,
+                            ),
+                            onPressed: () async {
+                              DateTime newDateTime = await showRoundedDatePicker(
+                              context: context,
+                              initialDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
+                              firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
+                              lastDate: DateTime(DateTime.now().year + 1),
+                              onTapDay: (DateTime dateTime, bool available) {
+                                if (!available) {
+                                  showDialog(
+                                      context: context,
+                                      builder: (c) => CupertinoAlertDialog(title: Text("This date cannot be selected."),actions: <Widget>[
+                                        CupertinoDialogAction(child: Text("OK"),onPressed: (){
+                                          Navigator.pop(context);
+                                        },)
+                                      ],));
+                                }
+                                return available;
+                              },
+                              borderRadius: 2,
+                              );
+                              if (newDateTime != null) {
+                                setState(() {
+                                  longbridge_date1 = newDateTime.year.toString() + "-" + newDateTime.month.toString() + "-" + newDateTime.day.toString();
+                                });
+                              }
+                          }),
+                          Expanded(
+                            child: Text(longbridge_date1, style: TextStyle(color: Colors.white, fontSize: 20)),
+                          )
+                        ]
+                      )
+                    ),
+                    SizedBox(height: 10.0,),
+                    Container(
+                      width: MediaQuery.of(context).size.width,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 150,
+                            child: Text(selected_longbridge_to == null ? 'Date of service' : 'Date of service ' + selected_longbridge_to.name, style: TextStyle(
+                              fontSize: 20.0,
+                              color: Colors.white,
+                            ),),
+                          ),
+                          SizedBox(width: 5.0,),
+                          new IconButton(
+                            icon: Icon(
+                              Icons.calendar_today_outlined,
+                              color: Colors.white,
+                              size: 32,
+                            ),
+                            onPressed: () async {
+                              DateTime newDateTime = await showRoundedDatePicker(
+                              context: context,
+                              initialDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
+                              firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
+                              lastDate: DateTime(DateTime.now().year + 1),
+                              onTapDay: (DateTime dateTime, bool available) {
+                                if (!available) {
+                                  showDialog(
+                                      context: context,
+                                      builder: (c) => CupertinoAlertDialog(title: Text("This date cannot be selected."),actions: <Widget>[
+                                        CupertinoDialogAction(child: Text("OK"),onPressed: (){
+                                          Navigator.pop(context);
+                                        },)
+                                      ],));
+                                }
+                                return available;
+                              },
+                              borderRadius: 2,
+                              );
+                              if (newDateTime != null) {
+                                setState(() {
+                                  longbridge_date2 = newDateTime.year.toString() + "-" + newDateTime.month.toString() + "-" + newDateTime.day.toString();
+                                });
+                              }
+                          }),
+                          Expanded(
+                            child: Text(longbridge_date2, style: TextStyle(color: Colors.white, fontSize: 20)),
+                          )
+                        ]
+                      )
+                    ),
+                    SizedBox(height: 10.0,),
+                    //Regis vehicle
+                    Container(
+                      width: MediaQuery.of(context).size.width,
+                      child: Column(
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Vehicle Registration Number',
+                                style: TextStyle(
+                                  // decoration: TextDecoration.underline,
+                                  fontSize: 17.0,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Container(
+                                child: TypeAheadFormField(
+                                  textFieldConfiguration: TextFieldConfiguration(
+                                    controller: this._typeAheadController,
+                                    decoration: InputDecoration(
+                                      labelText: 'Registration Number',
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                    ),
+                                    textCapitalization: TextCapitalization.characters,
+                                    onChanged: (content){
+                                      setState(() {
+                                        selected_truck_num = content;
+                                        veh_length_state = true;
+                                        veh_type_state = true;
+                                      });
+                                    }
+                                  ),          
+                                  onSuggestionSelected: (suggestion) {
+                                    this._typeAheadController.text = suggestion;
+                                    selected_truck_num = suggestion;
+                                    VehicleModule.changeTruckInfo(UserModule.user.sessId, suggestion).then((json){
+                                      setState(() {
+                                        changeTruckState(json);
+                                      });
+                                    });
+                                  }, 
+                                  itemBuilder: (context, suggestion) {
+                                    return ListTile(
+                                      title: Text(suggestion),
+                                    );
+                                  },
+                                  suggestionsCallback: (pattern) {
+                                    return getSuggestions(pattern);
+                                  },
+                                  transitionBuilder: (context, suggestionsBox, controller) {
+                                    return suggestionsBox;
+                                  },
+                                  validator: (value) {
+                                    if (value.isEmpty) {
+                                      return 'Please select a number';
+                                    }
+                                  },
+                                  onSaved: (value) => this._selectedCity = value,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 10.0,),
+                    //Length and Type Vehicle
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Length',
+                              style: TextStyle(
+                                // decoration: TextDecoration.underline,
+                                fontSize: 17.0,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Container(
+                              width: getScreen.getWidth()/2.5,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(5)
+                              ),
+                              child: DropdownButton(
+                                isExpanded: true,
+                                focusColor: Colors.white,
+                                dropdownColor: Colors.white,
+                                hint: Text('Vehicle Length'),
+                                value: selectedVeh_length,
+                                onChanged: (newValue) {
+                                  setState(() {
+                                    selectedVeh_length = newValue;
+                                  });
+                                },
+                                items: vehicles_length.map((veh_length) {
+                                  return DropdownMenuItem(
+                                    child: new Text(veh_length),
+                                    value: veh_length,
+                                  );
+                                }).toList(), 
+                                
+                              )
+                            ),
+                          ],
+                        ),
+                        SizedBox(width: 50.0,),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Type',
+                              style: TextStyle(
+                                // decoration: TextDecoration.underline,
+                                fontSize: 17.0,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Container(
+                              width: getScreen.getWidth()/2.5,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(5)
+                              ),
+                              child: DropdownButton(
+                                isExpanded: true,
+                                focusColor: Colors.white,
+                                dropdownColor: Colors.white,
+                                hint: Text('Vehicle Type'),
+                                value: selectedVeh_type,
+                                onChanged: (newValue) {
+                                  setState(() {
+                                    selectedVeh_type = newValue;
+                                  });
+                                },
+                                items: vehicles_type.map((type) {
+                                  return DropdownMenuItem(
+                                    child: new Text(type),
+                                    value: type,
+                                  );
+                                }).toList(), 
+                                
+                              )
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 10.0,),
+                    //Trailer vehicle
+                    Container(
+                      width: MediaQuery.of(context).size.width,
+                      child: Column(
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Trailer Registration Number',
+                                style: TextStyle(
+                                  // decoration: TextDecoration.underline,
+                                  fontSize: 17.0,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Container(
+                                child: TypeAheadFormField(
+                                  textFieldConfiguration: TextFieldConfiguration(
+                                    controller: this.trailerController,
+                                    decoration: InputDecoration(
+                                      labelText: 'Trailer Registration Number',
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                    ),
+                                    textCapitalization: TextCapitalization.characters,
+                                    onChanged: (content){
+                                      setState(() {
+                                        selected_trailer_num = content;
+                                        trailer_veh_length_state = true;
+                                        trailer_veh_type_state = true;
+                                      });
+                                    }
+                                  ),          
+                                  onSuggestionSelected: (suggestion) {
+                                    this.trailerController.text = suggestion;
+                                    selected_trailer_num = suggestion;
+                                    VehicleModule.changeTruckInfo(UserModule.user.sessId, suggestion).then((json){
+                                      setState(() {
+                                        changeTrailerState(json);
+                                      });
+                                    });
+                                  }, 
+                                  itemBuilder: (context, suggestion) {
+                                    return ListTile(
+                                      title: Text(suggestion),
+                                    );
+                                  },
+                                  suggestionsCallback: (pattern) {
+                                    return getTrailerSuggestions(pattern);
+                                  },
+                                  transitionBuilder: (context, suggestionsBox, controller) {
+                                    return suggestionsBox;
+                                  },
+                                  validator: (value) {
+                                    if (value.isEmpty) {
+                                      return 'Please select a number';
+                                    }
+                                  },
+                                  onSaved: (value) => this._selectedCity = value,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 10.0,),
+                    //Length and Type Vehicle
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Length',
+                              style: TextStyle(
+                                // decoration: TextDecoration.underline,
+                                fontSize: 17.0,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Container(
+                              width: getScreen.getWidth()/2.5,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(5)
+                              ),
+                              child: DropdownButton(
+                                isExpanded: true,
+                                focusColor: Colors.white,
+                                dropdownColor: Colors.white,
+                                hint: Text('Trailer Vehicle Length'),
+                                value: trailer_selectedVeh_length,
+                                onChanged: (newValue) {
+                                  setState(() {
+                                    trailer_selectedVeh_length = newValue;
+                                  });
+                                },
+                                items: vehicles_length.map((veh_length) {
+                                  return DropdownMenuItem(
+                                    child: new Text(veh_length),
+                                    value: veh_length,
+                                  );
+                                }).toList(), 
+                                
+                              )
+                            ),
+                          ],
+                        ),
+                        SizedBox(width: 50.0,),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Type',
+                              style: TextStyle(
+                                // decoration: TextDecoration.underline,
+                                fontSize: 17.0,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Container(
+                              width: getScreen.getWidth()/2.5,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(5)
+                              ),
+                              child: DropdownButton(
+                                isExpanded: true,
+                                focusColor: Colors.white,
+                                dropdownColor: Colors.white,
+                                hint: Text('Trailer Vehicle Type'),
+                                value: trailer_selectedVeh_type,
+                                // disabledHint: trailer_veh_type_state == false ? Text(trailer_selectedVeh_type) : null,
+                                onChanged: (newValue) {
+                                  setState(() {
+                                    trailer_selectedVeh_type = newValue;
+                                  });
+                                },
+                                items: vehicles_type.map((type) {
+                                  return DropdownMenuItem(
+                                    child: new Text(type),
+                                    value: type,
+                                  );
+                                }).toList(), 
+                                
+                              )
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 10.0,),
+                    Container(
+                      width: MediaQuery.of(context).size.width,
+                      child: offsetPopup(getScreen, widget.index),
+                    ),
+                    selected_longbridgeroute_list.length > 0 ? 
+                      Container(
+                        width: MediaQuery.of(context).size.width,
+                        height: 200,
+                        child: SingleChildScrollView(
+                          child: Container(
+                            child: Column(
+                              children: [
+                                for(var route in selected_longbridgeroute_list)
+                                  ListTile(
+                                    title: Column(
+                                      children: [
+                                        Text(route.route_name, style: TextStyle(color: Colors.white, fontSize: 17)),
+                                        Row(
+                                          children: [
+                                            Text(route.price, style: TextStyle(color: Colors.white, fontSize: 15)),
+                                            SizedBox(width: 10,),
+                                            Text(route.arrival, style: TextStyle(color: Colors.white, fontSize: 15)),
+                                            SizedBox(width: 10,),
+                                            Text(route.departure, style: TextStyle(color: Colors.white, fontSize: 15)),
+                                          ],
+                                        )
+                                      ],
+                                    ),
+                                    trailing: IconButton(
+                                      icon: Icon(
+                                        Icons.delete,
+                                        color: Colors.white,
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          selected_ferry_route_list.remove(route);
+                                        });
+                                      }),
+                                  )
+                              ],
+                            )
+                          ),
+                        ),
+                      ): Container(),
+                    SizedBox(height: 10.0,),
+                    //Desc
+                    Container(
+                      margin: EdgeInsets.only(top: 8.0, right: 10.0, bottom: 10.0, left: 10.0),
+                      width: getScreen.getOrientation()==Orientation.portrait ? getScreen.getWidth() : getScreen.getWidth()-100.0,
+                      child: TextField(
+                        textAlignVertical: TextAlignVertical.top,
+                        controller: inputDesc,
+                        maxLines: 5,
+                        minLines: 3,
+                        style: TextStyle(color: Colors.black, fontSize: 19.0),
+                        decoration: new InputDecoration(
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: BorderSide(color: Colors.white),
+                            ),
+                            border: new OutlineInputBorder(
+                                borderSide: new BorderSide(color: Colors.white)),
+                            hintText: 'type here',
+                            hintStyle: TextStyle(color: Colors.white),
+                            labelText: 'Description ',
+                            labelStyle: TextStyle(color: Colors.white, fontSize: 18.0),
+                            prefixIcon: const Icon(
+                              Icons.notes_outlined,
+                              color: Colors.white,
+                            ),
+                            prefixText: ' ',
+                            suffixStyle: const TextStyle(color: Colors.white)),
+                      ),
+                    ),
+                    
+                  ],
+                )
+              ),
+              // _buildFromToFerry(getScreen),
               SizedBox(height: 20.0,),
               _buildMakeBooking(getScreen),
             ],
@@ -1031,7 +1726,7 @@ class _ServicesViewState extends State<ServicesView> {
                       color: Colors.white,
                     ),),
                     SizedBox(width: 60.0,),
-                    Text(service_date ,style: TextStyle(color: Colors.white, fontSize: 24)),
+                    Text(service_date ,style: TextStyle(color: Colors.white, fontSize: 20)),
                     new IconButton(
                       icon: Icon(
                         Icons.calendar_today_outlined,
@@ -1072,49 +1767,56 @@ class _ServicesViewState extends State<ServicesView> {
                 padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
                 width: getScreen.getWidth(),
                 color: Colors.black.withOpacity(0.8),
-                child: TypeAheadFormField(
-                  textFieldConfiguration: TextFieldConfiguration(
-                    controller: this._typeAheadController,
-                    decoration: InputDecoration(
-                      labelText: 'Registration Number',
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                    textCapitalization: TextCapitalization.characters,
-                    onChanged: (content){
-                      setState(() {
-                        selected_truck_num = content;
-                        veh_length_state = true;
-                        veh_type_state = true;
-                      });
-                    }
-                  ),          
-                  onSuggestionSelected: (suggestion) {
-                    this._typeAheadController.text = suggestion;
-                    selected_truck_num = suggestion;
-                    VehicleModule.changeTruckInfo(UserModule.user.sessId, suggestion).then((json){
-                      setState(() {
-                        changeTruckState(json);
-                      });
-                    });
-                  }, 
-                  itemBuilder: (context, suggestion) {
-                    return ListTile(
-                      title: Text(suggestion),
-                    );
-                  },
-                  suggestionsCallback: (pattern) {
-                    return getSuggestions(pattern);
-                  },
-                  transitionBuilder: (context, suggestionsBox, controller) {
-                    return suggestionsBox;
-                  },
-                  validator: (value) {
-                    if (value.isEmpty) {
-                      return 'Please select a number';
-                    }
-                  },
-                  onSaved: (value) => this._selectedCity = value,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Registration Number',style: TextStyle(color: Colors.white, fontSize: 20)),
+                    SizedBox(height: 10.0,),
+                    TypeAheadFormField(
+                      textFieldConfiguration: TextFieldConfiguration(
+                        controller: this._typeAheadController,
+                        decoration: InputDecoration(
+                          labelText: 'Registration Number',
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                        textCapitalization: TextCapitalization.characters,
+                        onChanged: (content){
+                          setState(() {
+                            selected_truck_num = content;
+                            veh_length_state = true;
+                            veh_type_state = true;
+                          });
+                        }
+                      ),          
+                      onSuggestionSelected: (suggestion) {
+                        this._typeAheadController.text = suggestion;
+                        selected_truck_num = suggestion;
+                        VehicleModule.changeTruckInfo(UserModule.user.sessId, suggestion).then((json){
+                          setState(() {
+                            changeTruckState(json);
+                          });
+                        });
+                      }, 
+                      itemBuilder: (context, suggestion) {
+                        return ListTile(
+                          title: Text(suggestion),
+                        );
+                      },
+                      suggestionsCallback: (pattern) {
+                        return getSuggestions(pattern);
+                      },
+                      transitionBuilder: (context, suggestionsBox, controller) {
+                        return suggestionsBox;
+                      },
+                      validator: (value) {
+                        if (value.isEmpty) {
+                          return 'Please select a number';
+                        }
+                      },
+                      onSaved: (value) => this._selectedCity = value,
+                    )
+                  ]
                 ),
               ),
               
@@ -1124,67 +1826,88 @@ class _ServicesViewState extends State<ServicesView> {
                 width: getScreen.getWidth(),
                 color: Colors.black.withOpacity(0.8),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
-                    child: Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(5)
-                      ),
-                      child: DropdownButton(
-                        isExpanded: true,
-                        focusColor: Colors.white,
-                        dropdownColor: Colors.white,
-                        hint: Text('Vehicle Length'),
-                        value: selectedVeh_length,
-                        disabledHint: veh_length_state == false ? Text(selectedVeh_length) : null,
-                        onChanged: veh_length_state ? (newValue) {
-                          setState(() {
-                            selectedVeh_length = newValue;
-                          });
-                        } : null,
-                        items: vehicles_length.map((veh_length) {
-                          return DropdownMenuItem(
-                            child: new Text(veh_length),
-                            value: veh_length,
-                          );
-                        }).toList(), 
-                        
-                      )
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Length',
+                          style: TextStyle(
+                            // decoration: TextDecoration.underline,
+                            fontSize: 17.0,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Container(
+                          width: getScreen.getWidth()/2.5,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(5)
+                          ),
+                          child: DropdownButton(
+                            isExpanded: true,
+                            focusColor: Colors.white,
+                            dropdownColor: Colors.white,
+                            hint: Text('Vehicle Length'),
+                            value: selectedVeh_length,
+                            onChanged: (newValue) {
+                              setState(() {
+                                selectedVeh_length = newValue;
+                              });
+                            },
+                            items: vehicles_length.map((veh_length) {
+                              return DropdownMenuItem(
+                                child: new Text(veh_length),
+                                value: veh_length,
+                              );
+                            }).toList(), 
+                            
+                          )
+                        ),
+                      ],
                     ),
+                    SizedBox(width: 50.0,),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Type',
+                          style: TextStyle(
+                            // decoration: TextDecoration.underline,
+                            fontSize: 17.0,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Container(
+                          width: getScreen.getWidth()/2.5,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(5)
+                          ),
+                          child: DropdownButton(
+                            isExpanded: true,
+                            focusColor: Colors.white,
+                            dropdownColor: Colors.white,
+                            hint: Text('Vehicle Type'),
+                            value: selectedVeh_type,
+                            onChanged: (newValue) {
+                              setState(() {
+                                selectedVeh_type = newValue;
+                              });
+                            },
+                            items: vehicles_type.map((type) {
+                              return DropdownMenuItem(
+                                child: new Text(type),
+                                value: type,
+                              );
+                            }).toList(), 
+                            
+                          )
+                        ),
+                      ],
                     ),
-                    SizedBox(width: 15.0,),
-                    Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(5)
-                      ),
-                      child: DropdownButton(
-                        isExpanded: true,
-                        focusColor: Colors.white,
-                        dropdownColor: Colors.white,
-                        hint: Text('Vehicle Type'),
-                        value: selectedVeh_type,
-                        disabledHint: veh_type_state == false ? Text(selectedVeh_type) : null,
-                        onChanged: veh_type_state ? (newValue) {
-                          setState(() {
-                            selectedVeh_type = newValue;
-                          });
-                        } : null,
-                        items: vehicles_type.map((type) {
-                          return DropdownMenuItem(
-                            child: new Text(type),
-                            value: type,
-                          );
-                        }).toList(), 
-                        
-                      )
-                    ),
-                    )
-                  ]
+                  ],
                 )
               ),
               SizedBox(height: 20.0,),
@@ -1192,24 +1915,30 @@ class _ServicesViewState extends State<ServicesView> {
                 padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
                 width: getScreen.getWidth(),
                 color: Colors.black.withOpacity(0.8),
-                child: TextField(
-                // onFieldSubmitted: (value) => submitNumber(),
-                  controller: euro_tunnel_meter,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    errorText: error,
-                    filled: true,
-                    fillColor: Colors.white,
-                    hintText: 'Length',
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                      borderSide: BorderSide(color: Colors.white)
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                      borderSide: BorderSide(color: Colors.white)
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Length', style:TextStyle(color: Colors.white, fontSize: 20)),
+                    TextField(
+                    // onFieldSubmitted: (value) => submitNumber(),
+                      controller: euro_tunnel_meter,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        errorText: error,
+                        filled: true,
+                        fillColor: Colors.white,
+                        hintText: 'Length',
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                          borderSide: BorderSide(color: Colors.white)
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                          borderSide: BorderSide(color: Colors.white)
+                        )
+                      ),
                     )
-                  ),
+                  ]
                 )
               ),
               
@@ -1234,7 +1963,12 @@ class _ServicesViewState extends State<ServicesView> {
                         children: [
                           for(var route in selected_route_list)
                             ListTile(
-                              title: Text(route.route_name, style: TextStyle(color: Colors.white)),
+                              title: Column(
+                                children:[
+                                  Text(route.route_name, style: TextStyle(color: Colors.white)),
+                                  Text(service_date + " " + route.departure + "-" + route.arrival + " " + route.price, style: TextStyle(color: Colors.white))
+                                ]
+                              ),
                               trailing: IconButton(
                                         icon: Icon(
                                           Icons.delete,
@@ -1256,24 +1990,29 @@ class _ServicesViewState extends State<ServicesView> {
                 padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
                 width: getScreen.getWidth(),
                 color: Colors.black.withOpacity(0.8),
-                child: TextFormField(
-                // onFieldSubmitted: (value) => submitNumber(),
-                  controller: train_notes,
-                  maxLines: 5,
-                  decoration: InputDecoration(
-                    errorText: error,
-                    filled: true,
-                    fillColor: Colors.white,
-                    hintText: 'Notes:',
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                      borderSide: BorderSide(color: Colors.white)
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                      borderSide: BorderSide(color: Colors.white)
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children:[
+                    Text('Comment', style: TextStyle(color: Colors.white, fontSize: 20)),
+                    TextFormField(
+                      controller: train_notes,
+                      maxLines: 5,
+                      decoration: InputDecoration(
+                        errorText: error,
+                        filled: true,
+                        fillColor: Colors.white,
+                        hintText: 'Notes:',
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                          borderSide: BorderSide(color: Colors.white)
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                          borderSide: BorderSide(color: Colors.white)
+                        )
+                      ),
                     )
-                  ),
+                  ]
                 )
               ),
               SizedBox(height: 40.0,),
@@ -1447,49 +2186,55 @@ class _ServicesViewState extends State<ServicesView> {
                   padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
                   width: getScreen.getWidth(),
                   color: Colors.black.withOpacity(0.8),
-                  child: TypeAheadFormField(
-                    textFieldConfiguration: TextFieldConfiguration(
-                      controller: this._typeAheadController,
-                      decoration: InputDecoration(
-                        labelText: 'Registration Number',
-                        filled: true,
-                        fillColor: Colors.white,
-                      ),
-                      textCapitalization: TextCapitalization.characters,
-                      onChanged: (content){
-                        setState(() {
-                          selected_truck_num = content;
-                          veh_length_state = true;
-                          veh_type_state = true;
-                        });
-                      }
-                    ),          
-                    onSuggestionSelected: (suggestion) {
-                      this._typeAheadController.text = suggestion;
-                      selected_truck_num = suggestion;
-                      VehicleModule.changeTruckInfo(UserModule.user.sessId, suggestion).then((json){
-                        setState(() {
-                          changeTruckState(json);
-                        });
-                      });
-                    }, 
-                    itemBuilder: (context, suggestion) {
-                      return ListTile(
-                        title: Text(suggestion),
-                      );
-                    },
-                    suggestionsCallback: (pattern) {
-                      return getSuggestions(pattern);
-                    },
-                    transitionBuilder: (context, suggestionsBox, controller) {
-                      return suggestionsBox;
-                    },
-                    validator: (value) {
-                      if (value.isEmpty) {
-                        return 'Please select a number';
-                      }
-                    },
-                    onSaved: (value) => this._selectedCity = value,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Registration Number', style:TextStyle(color: Colors.white, fontSize: 20)),
+                      TypeAheadFormField(
+                        textFieldConfiguration: TextFieldConfiguration(
+                          controller: this._typeAheadController,
+                          decoration: InputDecoration(
+                            labelText: 'Registration Number',
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          textCapitalization: TextCapitalization.characters,
+                          onChanged: (content){
+                            setState(() {
+                              selected_truck_num = content;
+                              veh_length_state = true;
+                              veh_type_state = true;
+                            });
+                          }
+                        ),          
+                        onSuggestionSelected: (suggestion) {
+                          this._typeAheadController.text = suggestion;
+                          selected_truck_num = suggestion;
+                          VehicleModule.changeTruckInfo(UserModule.user.sessId, suggestion).then((json){
+                            setState(() {
+                              changeTruckState(json);
+                            });
+                          });
+                        }, 
+                        itemBuilder: (context, suggestion) {
+                          return ListTile(
+                            title: Text(suggestion),
+                          );
+                        },
+                        suggestionsCallback: (pattern) {
+                          return getSuggestions(pattern);
+                        },
+                        transitionBuilder: (context, suggestionsBox, controller) {
+                          return suggestionsBox;
+                        },
+                        validator: (value) {
+                          if (value.isEmpty) {
+                            return 'Please select a number';
+                          }
+                        },
+                        onSaved: (value) => this._selectedCity = value,
+                      )
+                    ]
                   ),
                 ),
                 
@@ -1499,65 +2244,88 @@ class _ServicesViewState extends State<ServicesView> {
                   width: getScreen.getWidth(),
                   color: Colors.black.withOpacity(0.8),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                      child: Container(
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(5)
-                        ),
-                        child: DropdownButton(
-                          isExpanded: true,
-                          focusColor: Colors.white,
-                          dropdownColor: Colors.white,
-                          hint: Text('Vehicle Length'),
-                          value: selectedVeh_length,
-                          onChanged: (newValue) {
-                            setState(() {
-                              selectedVeh_length = newValue;
-                            });
-                          },
-                          items: vehicles_length.map((veh_length) {
-                            return DropdownMenuItem(
-                              child: new Text(veh_length),
-                              value: veh_length,
-                            );
-                          }).toList(), 
-                          
-                        )
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Length',
+                            style: TextStyle(
+                              // decoration: TextDecoration.underline,
+                              fontSize: 17.0,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Container(
+                            width: getScreen.getWidth()/2.5,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(5)
+                            ),
+                            child: DropdownButton(
+                              isExpanded: true,
+                              focusColor: Colors.white,
+                              dropdownColor: Colors.white,
+                              hint: Text('Vehicle Length'),
+                              value: selectedVeh_length,
+                              onChanged: (newValue) {
+                                setState(() {
+                                  selectedVeh_length = newValue;
+                                });
+                              },
+                              items: vehicles_length.map((veh_length) {
+                                return DropdownMenuItem(
+                                  child: new Text(veh_length),
+                                  value: veh_length,
+                                );
+                              }).toList(), 
+                              
+                            )
+                          ),
+                        ],
                       ),
+                      SizedBox(width: 50.0,),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Type',
+                            style: TextStyle(
+                              // decoration: TextDecoration.underline,
+                              fontSize: 17.0,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Container(
+                            width: getScreen.getWidth()/2.5,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(5)
+                            ),
+                            child: DropdownButton(
+                              isExpanded: true,
+                              focusColor: Colors.white,
+                              dropdownColor: Colors.white,
+                              hint: Text('Vehicle Type'),
+                              value: selectedVeh_type,
+                              onChanged: (newValue) {
+                                setState(() {
+                                  selectedVeh_type = newValue;
+                                });
+                              },
+                              items: vehicles_type.map((type) {
+                                return DropdownMenuItem(
+                                  child: new Text(type),
+                                  value: type,
+                                );
+                              }).toList(), 
+                              
+                            )
+                          ),
+                        ],
                       ),
-                      SizedBox(width: 10.0,),
-                      Expanded(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(5)
-                        ),
-                        child: DropdownButton(
-                          isExpanded: true,
-                          focusColor: Colors.white,
-                          dropdownColor: Colors.white,
-                          hint: Text('Vehicle Type'),
-                          value: selectedVeh_type,
-                          onChanged: (newValue) {
-                            setState(() {
-                              selectedVeh_type = newValue;
-                            });
-                          },
-                          items: vehicles_type.map((type) {
-                            return DropdownMenuItem(
-                              child: new Text(type),
-                              value: type,
-                            );
-                          }).toList(), 
-                          
-                        )
-                      ),
-                      )
-                    ]
+                    ],
                   )
                 ),
                 SizedBox(height: 20.0,),
@@ -1565,32 +2333,38 @@ class _ServicesViewState extends State<ServicesView> {
                   padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
                   width: getScreen.getWidth(),
                   color: Colors.black.withOpacity(0.8),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(5)
-                    ),
-                    child: DropdownButton(
-                      focusColor: Colors.white,
-                      dropdownColor: Colors.white,
-                      hint: Text('Vehicle Class Type'),
-                      value: selectedVeh_class_type,
-                      onChanged: (newValue) {
-                        setState(() {
-                          selectedVeh_class_type = newValue;
-                        });
-                      },
-                      items: vehicles_class_type.map((class_type) {
-                        return DropdownMenuItem(
-                          child: Container(
-                            child: new Text(class_type.vehicle_type_name),
-                            width: getScreen.getWidth()-50,
-                          ),
-                          value: class_type,
-                        );
-                      }).toList(), 
-                      
-                    )
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Vehicle Class Type', style: TextStyle(color: Colors.white, fontSize: 20)),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(5)
+                        ),
+                        child: DropdownButton(
+                          focusColor: Colors.white,
+                          dropdownColor: Colors.white,
+                          hint: Text('Vehicle Class Type'),
+                          value: selectedVeh_class_type,
+                          onChanged: (newValue) {
+                            setState(() {
+                              selectedVeh_class_type = newValue;
+                            });
+                          },
+                          items: vehicles_class_type.map((class_type) {
+                            return DropdownMenuItem(
+                              child: Container(
+                                child: new Text(class_type.vehicle_type_name),
+                                width: getScreen.getWidth()-50,
+                              ),
+                              value: class_type,
+                            );
+                          }).toList(), 
+                          
+                        )
+                      )
+                    ]
                   ),
                 ),
                 if(selectedVeh_class_type != null && selectedVeh_class_type.vehicle_type_name == "Other")
@@ -1600,23 +2374,29 @@ class _ServicesViewState extends State<ServicesView> {
                     padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
                     width: getScreen.getWidth(),
                     color: Colors.black.withOpacity(0.8),
-                    child: TextField(
-                    // onFieldSubmitted: (value) => submitNumber(),
-                      controller: vehicle_class_other,
-                      decoration: InputDecoration(
-                        errorText: error,
-                        filled: true,
-                        fillColor: Colors.white,
-                        hintText: 'Vehicle Class Other',
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                          borderSide: BorderSide(color: Colors.white)
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                          borderSide: BorderSide(color: Colors.white)
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Vehicle Class Other', style:TextStyle(color: Colors.white, fontSize: 20)),
+                        TextField(
+                        // onFieldSubmitted: (value) => submitNumber(),
+                          controller: vehicle_class_other,
+                          decoration: InputDecoration(
+                            errorText: error,
+                            filled: true,
+                            fillColor: Colors.white,
+                            hintText: 'Vehicle Class Other',
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                              borderSide: BorderSide(color: Colors.white)
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                              borderSide: BorderSide(color: Colors.white)
+                            )
+                          ),
                         )
-                      ),
+                      ]
                     )
                   ),
 
@@ -1625,32 +2405,38 @@ class _ServicesViewState extends State<ServicesView> {
                   padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
                   width: getScreen.getWidth(),
                   color: Colors.black.withOpacity(0.8),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(5)
-                    ),
-                    child: DropdownButton(
-                      focusColor: Colors.white,
-                      dropdownColor: Colors.white,
-                      hint: Text('Euro Class Rating of the Vehicle'),
-                      value: selectedEuro_veh_type,
-                      onChanged: (newValue) {
-                        setState(() {
-                          selectedEuro_veh_type = newValue;
-                        });
-                      },
-                      items: vehicles_euro_type.map((euro_type) {
-                        return DropdownMenuItem(
-                          child: Container(
-                            child: new Text(euro_type.vehicle_euro_type_name),
-                            width: getScreen.getWidth()-50,
-                          ),
-                          value: euro_type,
-                        );
-                      }).toList(), 
-                      
-                    )
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Euro Class Rating of the Vehicle', style: TextStyle(color: Colors.white, fontSize: 20)),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(5)
+                        ),
+                        child: DropdownButton(
+                          focusColor: Colors.white,
+                          dropdownColor: Colors.white,
+                          hint: Text('Euro Class Rating of the Vehicle'),
+                          value: selectedEuro_veh_type,
+                          onChanged: (newValue) {
+                            setState(() {
+                              selectedEuro_veh_type = newValue;
+                            });
+                          },
+                          items: vehicles_euro_type.map((euro_type) {
+                            return DropdownMenuItem(
+                              child: Container(
+                                child: new Text(euro_type.vehicle_euro_type_name),
+                                width: getScreen.getWidth()-50,
+                              ),
+                              value: euro_type,
+                            );
+                          }).toList(), 
+                          
+                        )
+                      )
+                    ]
                   ),
                 ),
                 if(selectedEuro_veh_type != null && selectedEuro_veh_type.vehicle_euro_type_name == "Other")
@@ -1660,23 +2446,29 @@ class _ServicesViewState extends State<ServicesView> {
                     padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
                     width: getScreen.getWidth(),
                     color: Colors.black.withOpacity(0.8),
-                    child: TextField(
-                    // onFieldSubmitted: (value) => submitNumber(),
-                      controller: vehicle_euro_class,
-                      decoration: InputDecoration(
-                        errorText: error,
-                        filled: true,
-                        fillColor: Colors.white,
-                        hintText: 'Vehicle Euro Class',
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                          borderSide: BorderSide(color: Colors.white)
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                          borderSide: BorderSide(color: Colors.white)
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children:[
+                        Text('Vehicle Euro Class', style:TextStyle(color: Colors.white, fontSize: 20)),
+                        TextField(
+                        // onFieldSubmitted: (value) => submitNumber(),
+                          controller: vehicle_euro_class,
+                          decoration: InputDecoration(
+                            errorText: error,
+                            filled: true,
+                            fillColor: Colors.white,
+                            hintText: 'Vehicle Euro Class',
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                              borderSide: BorderSide(color: Colors.white)
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                              borderSide: BorderSide(color: Colors.white)
+                            )
+                          ),
                         )
-                      ),
+                      ]
                     )
                   ),
                 SizedBox(height: 20.0,),
@@ -1684,25 +2476,31 @@ class _ServicesViewState extends State<ServicesView> {
                   padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
                   width: getScreen.getWidth(),
                   color: Colors.black.withOpacity(0.8),
-                  child: TextFormField(
-                  // onFieldSubmitted: (value) => submitNumber(),
-                    controller: notes,
-                    keyboardType: TextInputType.number,
-                    maxLines: 5,
-                    decoration: InputDecoration(
-                      errorText: error,
-                      filled: true,
-                      fillColor: Colors.white,
-                      hintText: 'Notes:',
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                        borderSide: BorderSide(color: Colors.white)
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                        borderSide: BorderSide(color: Colors.white)
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children:[
+                      Text('Comment', style:TextStyle(color: Colors.white, fontSize: 20)),
+                      TextFormField(
+                      // onFieldSubmitted: (value) => submitNumber(),
+                        controller: notes,
+                        keyboardType: TextInputType.number,
+                        maxLines: 5,
+                        decoration: InputDecoration(
+                          errorText: error,
+                          filled: true,
+                          fillColor: Colors.white,
+                          hintText: 'Notes:',
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                            borderSide: BorderSide(color: Colors.white)
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                            borderSide: BorderSide(color: Colors.white)
+                          )
+                        ),
                       )
-                    ),
+                    ]
                   )
                 ),
                 SizedBox(height: 20.0,),
@@ -1822,49 +2620,55 @@ class _ServicesViewState extends State<ServicesView> {
                 padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
                 width: getScreen.getWidth(),
                 color: Colors.black.withOpacity(0.8),
-                child: TypeAheadFormField(
-                  textFieldConfiguration: TextFieldConfiguration(
-                    controller: this._typeAheadController,
-                    decoration: InputDecoration(
-                      labelText: 'Registration Number',
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                    textCapitalization: TextCapitalization.characters,
-                    onChanged: (content){
-                      setState(() {
-                        selected_truck_num = content;
-                        veh_length_state = true;
-                        veh_type_state = true;
-                      });
-                    }
-                  ),          
-                  onSuggestionSelected: (suggestion) {
-                    this._typeAheadController.text = suggestion;
-                    selected_truck_num = suggestion;
-                    VehicleModule.changeTruckInfo(UserModule.user.sessId, suggestion).then((json){
-                      setState(() {
-                        changeTruckState(json);
-                      });
-                    });
-                  }, 
-                  itemBuilder: (context, suggestion) {
-                    return ListTile(
-                      title: Text(suggestion),
-                    );
-                  },
-                  suggestionsCallback: (pattern) {
-                    return getSuggestions(pattern);
-                  },
-                  transitionBuilder: (context, suggestionsBox, controller) {
-                    return suggestionsBox;
-                  },
-                  validator: (value) {
-                    if (value.isEmpty) {
-                      return 'Please select a number';
-                    }
-                  },
-                  onSaved: (value) => this._selectedCity = value,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Registration Number', style:TextStyle(color: Colors.white, fontSize:20)),
+                    TypeAheadFormField(
+                      textFieldConfiguration: TextFieldConfiguration(
+                        controller: this._typeAheadController,
+                        decoration: InputDecoration(
+                          labelText: 'Registration Number',
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                        textCapitalization: TextCapitalization.characters,
+                        onChanged: (content){
+                          setState(() {
+                            selected_truck_num = content;
+                            veh_length_state = true;
+                            veh_type_state = true;
+                          });
+                        }
+                      ),          
+                      onSuggestionSelected: (suggestion) {
+                        this._typeAheadController.text = suggestion;
+                        selected_truck_num = suggestion;
+                        VehicleModule.changeTruckInfo(UserModule.user.sessId, suggestion).then((json){
+                          setState(() {
+                            changeTruckState(json);
+                          });
+                        });
+                      }, 
+                      itemBuilder: (context, suggestion) {
+                        return ListTile(
+                          title: Text(suggestion),
+                        );
+                      },
+                      suggestionsCallback: (pattern) {
+                        return getSuggestions(pattern);
+                      },
+                      transitionBuilder: (context, suggestionsBox, controller) {
+                        return suggestionsBox;
+                      },
+                      validator: (value) {
+                        if (value.isEmpty) {
+                          return 'Please select a number';
+                        }
+                      },
+                      onSaved: (value) => this._selectedCity = value,
+                    )
+                  ]
                 ),
               ),
               SizedBox(height: 20.0,),
@@ -1873,63 +2677,117 @@ class _ServicesViewState extends State<ServicesView> {
                 width: getScreen.getWidth(),
                 color: Colors.black.withOpacity(0.8),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
-                    child: Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(5)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Length',
+                          style: TextStyle(
+                            // decoration: TextDecoration.underline,
+                            fontSize: 17.0,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Container(
+                          width: getScreen.getWidth()/2.5,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(5)
+                          ),
+                          child: DropdownButton(
+                            isExpanded: true,
+                            focusColor: Colors.white,
+                            dropdownColor: Colors.white,
+                            hint: Text('Vehicle Length'),
+                            value: selectedVeh_length,
+                            onChanged: (newValue) {
+                              setState(() {
+                                selectedVeh_length = newValue;
+                              });
+                            },
+                            items: vehicles_length.map((veh_length) {
+                              return DropdownMenuItem(
+                                child: new Text(veh_length),
+                                value: veh_length,
+                              );
+                            }).toList(), 
+                            
+                          )
+                        ),
+                      ],
+                    ),
+                    SizedBox(width: 50.0,),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Type',
+                          style: TextStyle(
+                            // decoration: TextDecoration.underline,
+                            fontSize: 17.0,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Container(
+                          width: getScreen.getWidth()/2.5,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(5)
+                          ),
+                          child: DropdownButton(
+                            isExpanded: true,
+                            focusColor: Colors.white,
+                            dropdownColor: Colors.white,
+                            hint: Text('Vehicle Type'),
+                            value: selectedVeh_type,
+                            onChanged: (newValue) {
+                              setState(() {
+                                selectedVeh_type = newValue;
+                              });
+                            },
+                            items: vehicles_type.map((type) {
+                              return DropdownMenuItem(
+                                child: new Text(type),
+                                value: type,
+                              );
+                            }).toList(), 
+                            
+                          )
+                        ),
+                      ],
+                    ),
+                  ],
+                )
+              ),
+              SizedBox(height: 20.0,),
+              Container(
+                padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
+                width: getScreen.getWidth(),
+                color: Colors.black.withOpacity(0.8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children:[
+                    Text('Length (meters)', style: TextStyle(color: Colors.white, fontSize: 20)),
+                    TextField(
+                    // onFieldSubmitted: (value) => submitNumber(),
+                      controller: euro_tunnel_meter,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        errorText: error,
+                        filled: true,
+                        fillColor: Colors.white,
+                        hintText: 'Length (meters)',
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                          borderSide: BorderSide(color: Colors.white)
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                          borderSide: BorderSide(color: Colors.white)
+                        )
                       ),
-                      child: DropdownButton(
-                        isExpanded: true,
-                        focusColor: Colors.white,
-                        dropdownColor: Colors.white,
-                        hint: Text('Vehicle Length'),
-                        value: selectedVeh_length,
-                        onChanged: (newValue) {
-                          setState(() {
-                            selectedVeh_length = newValue;
-                          });
-                        },
-                        items: vehicles_length.map((veh_length) {
-                          return DropdownMenuItem(
-                            child: new Text(veh_length),
-                            value: veh_length,
-                          );
-                        }).toList(), 
-                        
-                      )
-                    ),
-                    ),
-                    SizedBox(width: 15.0,),
-                    Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(5)
-                      ),
-                      child: DropdownButton(
-                        isExpanded: true,
-                        focusColor: Colors.white,
-                        dropdownColor: Colors.white,
-                        hint: Text('Vehicle Type'),
-                        value: selectedVeh_type,
-                        onChanged: (newValue) {
-                          setState(() {
-                            selectedVeh_type = newValue;
-                          });
-                        },
-                        items: vehicles_type.map((type) {
-                          return DropdownMenuItem(
-                            child: new Text(type),
-                            value: type,
-                          );
-                        }).toList(), 
-                        
-                      )
-                    ),
                     )
                   ]
                 )
@@ -1939,27 +2797,591 @@ class _ServicesViewState extends State<ServicesView> {
                 padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
                 width: getScreen.getWidth(),
                 color: Colors.black.withOpacity(0.8),
-                child: TextField(
-                // onFieldSubmitted: (value) => submitNumber(),
-                  controller: euro_tunnel_meter,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    errorText: error,
-                    filled: true,
-                    fillColor: Colors.white,
-                    hintText: 'Length (meters)',
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                      borderSide: BorderSide(color: Colors.white)
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                      borderSide: BorderSide(color: Colors.white)
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children:[
+                    Text('Comment', style:TextStyle(color: Colors.white, fontSize: 20)),
+                    TextFormField(
+                    // onFieldSubmitted: (value) => submitNumber(),
+                      controller: euro_notes,
+                      maxLines: 5,
+                      decoration: InputDecoration(
+                        errorText: error,
+                        filled: true,
+                        fillColor: Colors.white,
+                        hintText: 'Notes:',
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                          borderSide: BorderSide(color: Colors.white)
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                          borderSide: BorderSide(color: Colors.white)
+                        )
+                      ),
                     )
-                  ),
+                  ]
                 )
               ),
               SizedBox(height: 20.0,),
+              Container(
+                color: Colors.black.withOpacity(0.8),
+                child: Theme(
+                  data: ThemeData(unselectedWidgetColor: Colors.white),
+                  child: CheckboxListTile(
+                    title: Text("Not Empty", style: TextStyle(color: Colors.white, fontSize: 20.0)),
+                    value: empty_flag, 
+                    onChanged: (value){
+                      setState(() {
+                        empty_flag = value;
+                      });
+                    },
+                    controlAffinity: ListTileControlAffinity.leading,
+                    // contentPadding: EdgeInsets.all(0),
+                  )
+                ),
+              ),
+              empty_flag == true ? SizedBox(height: 20.0,) : Container(),
+              empty_flag == true ? Container(
+                padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
+                width: getScreen.getWidth(),
+                color: Colors.black.withOpacity(0.8),
+                child: Row(
+                  children: [
+                    Text('MRN', style: TextStyle(color: Colors.white)),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: TextFormField(
+                      // onFieldSubmitted: (value) => submitNumber(),
+                        controller: euro_mrn,
+                        decoration: InputDecoration(
+                          errorText: error,
+                          filled: true,
+                          fillColor: Colors.white,
+                          hintText: 'MRN',
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                            borderSide: BorderSide(color: Colors.white)
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                            borderSide: BorderSide(color: Colors.white)
+                          )
+                        ),
+                      )
+                    )
+                  ]
+                )
+              ) : Container(),
+              empty_flag == true ? SizedBox(height: 20.0,) : Container(),
+              empty_flag == true ? Container(
+                padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
+                width: getScreen.getWidth(),
+                color: Colors.black.withOpacity(0.8),
+                child: Row(
+                  children: [
+                    FlatButton(
+                      shape: RoundedRectangleBorder(
+                          side: BorderSide(color: Colors.white)),
+                      color: Colors.transparent,
+                      textColor: Colors.white,
+                      padding: EdgeInsets.only(top: 3.0, bottom: 3.0, left: 15.0, right: 15.0),
+                      onPressed: () {
+                        getMRNFilesFromGallery();
+                      },
+                      child: Text(
+                        "Attach File",
+                        style: TextStyle(
+                            fontSize: 20.0,
+                            fontWeight: FontWeight.bold
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 20.0,),
+                    mrn_files.length > 0 ? 
+                    Container(
+                      height: 100,
+                      child: SingleChildScrollView(
+                        child: Container(
+                          child: Column(
+                            children: [
+                              for(var file in mrn_files)
+                                Text(file.name, style:TextStyle(color: Colors.white, fontSize: 20.0)),
+                            ],
+                          )
+                        ),
+                      )
+                    ): Container(child: Text('no file', style:TextStyle(color: Colors.white, fontSize: 20.0)))
+                  ],
+                ),
+              ) : Container(),
+              SizedBox(height: 20.0,),
+              empty_flag == true ? Container(
+                padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
+                width: getScreen.getWidth(),
+                color: Colors.black.withOpacity(0.8),
+                child: Row(
+                  children: [
+                    Text('GRM', style:TextStyle(color: Colors.white)),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: TextFormField(
+                      // onFieldSubmitted: (value) => submitNumber(),
+                        controller: euro_grm,
+                        decoration: InputDecoration(
+                          errorText: error,
+                          filled: true,
+                          fillColor: Colors.white,
+                          hintText: 'GRM',
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                            borderSide: BorderSide(color: Colors.white)
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                            borderSide: BorderSide(color: Colors.white)
+                          )
+                        ),
+                      )
+                    )
+                  ]
+                )
+              ) : Container(),
+              empty_flag == true ? SizedBox(height: 20.0,) : Container(),
+              empty_flag == true ? Container(
+                padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
+                width: getScreen.getWidth(),
+                color: Colors.black.withOpacity(0.8),
+                child: Row(
+                  children: [
+                    FlatButton(
+                      shape: RoundedRectangleBorder(
+                          side: BorderSide(color: Colors.white)),
+                      color: Colors.transparent,
+                      textColor: Colors.white,
+                      padding: EdgeInsets.only(top: 3.0, bottom: 3.0, left: 15.0, right: 15.0),
+                      onPressed: () {
+                        getGRMFilesFromGallery();
+                      },
+                      child: Text(
+                        "Attach File",
+                        style: TextStyle(
+                            fontSize: 20.0,
+                            fontWeight: FontWeight.bold
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 20.0,),
+                    grm_files.length > 0 ? 
+                    Container(
+                      height: 100,
+                      child: SingleChildScrollView(
+                        child: Container(
+                          child: Column(
+                            children: [
+                              for(var file in mrn_files)
+                                Text(file.name, style:TextStyle(color: Colors.white, fontSize: 20.0)),
+                            ],
+                          )
+                        ),
+                      )
+                    ): Container(child: Text('no file', style:TextStyle(color: Colors.white, fontSize: 20.0)))
+                  ],
+                ),
+              ) : Container(),
+              SizedBox(height: 20.0,),
+              _buildMakeBooking(getScreen),
+            ],
+          ),
+        ),
+      );
+    }
+    if(widget.index == 5){            //English
+      provider.setDashboardView = true;
+      
+      return vehicles_length_flag == false && vehicle_type_flag && vehicle_regnum_flag ? Container(
+          padding: EdgeInsets.only(top: (getScreen.getHeight()/2)-30.0, left: getScreen.getWidth() / 2),
+          child: CircularProgressIndicator(),
+        ):
+      SingleChildScrollView(
+        padding: EdgeInsets.only(top: (getScreen.getHeight()/2)-30.0),
+        child: Container(
+          color: Colors.amberAccent,
+          child: Column(
+            children: [
+              Container(
+                padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
+                width: getScreen.getWidth(),
+                color: Colors.black.withOpacity(0.8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(getScreen.getOrientation()== Orientation.portrait? "Select Location":'Select Location', style: TextStyle(
+                      fontSize: 23.0,
+                      color: Colors.white,
+                    ),),
+                    SizedBox(width: 30.0,),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(5)
+                      ),
+                      child: DropdownButton(
+                        focusColor: Colors.white,
+                        dropdownColor: Colors.white,
+                        hint: Text('First Selection'),
+                        value: selected_english_messina,
+                        onChanged: (newValue) {
+                          setState(() {
+                            selected_english_messina = newValue;
+                            print("----english:${selected_english_messina}");
+                            getSecondLocation(selected_english_messina);
+                          });
+                        },
+                        items: english_messina.map((route) {
+                          return DropdownMenuItem(
+                            child: Container(
+                             child: new Text(route),
+                            ),
+                            value: route,
+                          );
+                        }).toList(), 
+                        
+                      )
+                    )
+                  ],
+                ),
+              ),
+              SizedBox(height: 20.0,),
+              Container(
+                padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
+                width: getScreen.getWidth(),
+                color: Colors.black.withOpacity(0.8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(getScreen.getOrientation()== Orientation.portrait? "Select Location":'Select Location', style: TextStyle(
+                      fontSize: 23.0,
+                      color: Colors.white,
+                    ),),
+                    SizedBox(width: 30.0,),
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(5)
+                        ),
+                        child: DropdownButton(
+                          focusColor: Colors.white,
+                          dropdownColor: Colors.white,
+                          isExpanded: true,
+                          hint: Text('Second Selection'),
+                          value: selected_second_location,
+                          onChanged: (newValue) {
+                            setState(() {
+                              selected_second_location = newValue;
+                            });
+                          },
+                          items: second_location_list.map((route) {
+                            return DropdownMenuItem(
+                              child: Container(
+                              child: new Text(route.route_name),
+                              ),
+                              value: route,
+                            );
+                          }).toList(), 
+                          
+                        )
+                      )
+                    )
+                  ],
+                ),
+              ),
+              SizedBox(height: 20.0,),
+              Container(
+                padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
+                width: getScreen.getWidth(),
+                color: Colors.black.withOpacity(0.8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(getScreen.getOrientation()== Orientation.portrait?"Select Date":'Select Date', style: TextStyle(
+                      fontSize: 23.0,
+                      color: Colors.white,
+                    ),),
+                    SizedBox(width: 60.0,),
+                    Text(enlgish_messina_date, style: TextStyle(color: Colors.white, fontSize: 24)),
+                    new IconButton(
+                      icon: Icon(
+                        Icons.calendar_today_outlined,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                      onPressed: () async {
+                        DateTime newDateTime = await showRoundedDatePicker(
+                        context: context,
+                        initialDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
+                        firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
+                        lastDate: DateTime(DateTime.now().year + 1),
+                        onTapDay: (DateTime dateTime, bool available) {
+                          if (!available) {
+                            showDialog(
+                                context: context,
+                                builder: (c) => CupertinoAlertDialog(title: Text("This date cannot be selected."),actions: <Widget>[
+                                  CupertinoDialogAction(child: Text("OK"),onPressed: (){
+                                    Navigator.pop(context);
+                                  },)
+                                ],));
+                          }
+                          return available;
+                        },
+                        borderRadius: 2,
+                        
+                        );
+                        if (newDateTime != null) {
+                          setState(() {
+                            enlgish_messina_date = newDateTime.year.toString() + "-" + newDateTime.month.toString() + "-" + newDateTime.day.toString();
+                          });
+                        }
+                    }),
+                  ],
+                ),
+              ),
+              SizedBox(height: 20.0,),
+              Container(
+                padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
+                width: getScreen.getWidth(),
+                color: Colors.black.withOpacity(0.8),
+                child: Row(
+                  children:[
+                    Text('Registration Number', style: TextStyle(
+                      fontSize: 20.0,
+                      color: Colors.white,
+                    ),),
+                    SizedBox(width: 10.0,),
+                    Expanded(
+                      child:TypeAheadFormField(
+                        textFieldConfiguration: TextFieldConfiguration(
+                          controller: this._typeAheadController,
+                          decoration: InputDecoration(
+                            labelText: 'Registration Number',
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          textCapitalization: TextCapitalization.characters,
+                          onChanged: (content){
+                            setState(() {
+                              selected_truck_num = content;
+                              veh_length_state = true;
+                              veh_type_state = true;
+                            });
+                          }
+                        ),          
+                        onSuggestionSelected: (suggestion) {
+                          this._typeAheadController.text = suggestion;
+                          selected_truck_num = suggestion;
+                          VehicleModule.changeTruckInfo(UserModule.user.sessId, suggestion).then((json){
+                            setState(() {
+                              changeTruckState(json);
+                            });
+                          });
+                        }, 
+                        itemBuilder: (context, suggestion) {
+                          return ListTile(
+                            title: Text(suggestion),
+                          );
+                        },
+                        suggestionsCallback: (pattern) {
+                          return getSuggestions(pattern);
+                        },
+                        transitionBuilder: (context, suggestionsBox, controller) {
+                          return suggestionsBox;
+                        },
+                        validator: (value) {
+                          if (value.isEmpty) {
+                            return 'Please select a number';
+                          }
+                        },
+                        onSaved: (value) => this._selectedCity = value,
+                      )
+                    )
+                  ]
+                ),
+              ),
+              SizedBox(height: 20.0,),
+              Container(
+                padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
+                width: getScreen.getWidth(),
+                color: Colors.black.withOpacity(0.8),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        Expanded(
+                          child: Text('Vehicle Length', style: TextStyle(
+                            fontSize: 20.0,
+                            color: Colors.white,
+                          ),),
+                        ),
+                        SizedBox(width: 15.0,),
+                        Expanded(
+                          child: Text('Vehicle Type', style: TextStyle(
+                            fontSize: 20.0,
+                            color: Colors.white,
+                          ),),
+                        )
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        Expanded(
+                          child: Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(5)
+                            ),
+                            child: DropdownButton(
+                              isExpanded: true,
+                              focusColor: Colors.white,
+                              dropdownColor: Colors.white,
+                              hint: Text('Vehicle Length'),
+                              value: selectedVeh_length,
+                              onChanged: (newValue) {
+                                setState(() {
+                                  selectedVeh_length = newValue;
+                                });
+                              },
+                              items: vehicles_length.map((veh_length) {
+                                return DropdownMenuItem(
+                                  child: new Text(veh_length),
+                                  value: veh_length,
+                                );
+                              }).toList(), 
+                              
+                            )
+                          ),
+                        ),
+                        SizedBox(width: 15.0,),
+                        Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(5)
+                          ),
+                          child: DropdownButton(
+                            isExpanded: true,
+                            focusColor: Colors.white,
+                            dropdownColor: Colors.white,
+                            hint: Text('Vehicle Type'),
+                            value: selectedVeh_type,
+                            onChanged: (newValue) {
+                              setState(() {
+                                selectedVeh_type = newValue;
+                              });
+                            },
+                            items: vehicles_type.map((type) {
+                              return DropdownMenuItem(
+                                child: new Text(type),
+                                value: type,
+                              );
+                            }).toList(), 
+                            
+                          )
+                        ),
+                        )
+                      ]
+                    )
+                  ]
+                )
+              ),
+              SizedBox(height: 20.0,),
+              Container(
+                padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
+                width: getScreen.getWidth(),
+                color: Colors.black.withOpacity(0.8),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Length', style: TextStyle(
+                      fontSize: 20.0,
+                      color: Colors.white,
+                    ),),
+                    SizedBox(height: 15.0,),
+                    TextField(
+                    // onFieldSubmitted: (value) => submitNumber(),
+                      controller: euro_tunnel_meter,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        errorText: error,
+                        filled: true,
+                        fillColor: Colors.white,
+                        hintText: 'Length (meters)',
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                          borderSide: BorderSide(color: Colors.white)
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                          borderSide: BorderSide(color: Colors.white)
+                        )
+                      ),
+                    )
+                  ]
+                )
+              ),
+              SizedBox(height: 20.0,),
+              Container(
+                padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
+                width: getScreen.getWidth(),
+                color: Colors.black.withOpacity(0.8),
+                child: offsetPopup(getScreen, widget.index),
+              ),
+              selected_messina_route_list.length > 0 ? 
+                Container(
+                  padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
+                  width: getScreen.getWidth(),
+                  color: Colors.black.withOpacity(0.8),
+                  height: 200,
+                  child: SingleChildScrollView(
+                    child: Container(
+                      child: Column(
+                        children: [
+                          for(var route in selected_messina_route_list)
+                            ListTile(
+                              title: Column(
+                                children: [
+                                  Text(route.route_name, style: TextStyle(color: Colors.white, fontSize: 17)),
+                                  Row(
+                                    children: [
+                                      Text(route.price, style: TextStyle(color: Colors.white, fontSize: 15)),
+                                      SizedBox(width: 10,),
+                                      Text(route.arrival, style: TextStyle(color: Colors.white, fontSize: 15)),
+                                      SizedBox(width: 10,),
+                                      Text(route.departure, style: TextStyle(color: Colors.white, fontSize: 15)),
+                                    ],
+                                  )
+                                ],
+                              ),
+                              trailing: IconButton(
+                                icon: Icon(
+                                  Icons.delete,
+                                  color: Colors.white,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    selected_ferry_route_list.remove(route);
+                                  });
+                                }),
+                            )
+                        ],
+                      )
+                    ),
+                  ),
+                ): Container(),
               Container(
                 padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
                 width: getScreen.getWidth(),
@@ -1985,43 +3407,172 @@ class _ServicesViewState extends State<ServicesView> {
                 )
               ),
               SizedBox(height: 20.0,),
+              selected_english_messina == "English-channel" ? 
               Container(
+                color: Colors.black.withOpacity(0.8),
+                child: Theme(
+                  data: ThemeData(unselectedWidgetColor: Colors.white),
+                  child: CheckboxListTile(
+                    title: Text("Not Empty", style: TextStyle(color: Colors.white, fontSize: 20.0)),
+                    value: empty_flag, 
+                    onChanged: (value){
+                      setState(() {
+                        empty_flag = value;
+                      });
+                    },
+                    controlAffinity: ListTileControlAffinity.leading,
+                    // contentPadding: EdgeInsets.all(0),
+                  )
+                ),
+              ) : Container(),
+              selected_english_messina == "English-channel" && empty_flag == true ? SizedBox(height: 20.0,) : Container(),
+              selected_english_messina == "English-channel" && empty_flag == true ? Container(
                 padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
                 width: getScreen.getWidth(),
                 color: Colors.black.withOpacity(0.8),
-                child: offsetPopup(getScreen, widget.index),
-              ),
-              SizedBox(height: selected_route_list.length > 0 ? 20.0 : 0,),
-              selected_route_list.length > 0 ? 
-                Container(
-                  padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
-                  width: getScreen.getWidth(),
-                  height: 200,
-                  color: Colors.black.withOpacity(0.8),
-                  child: SingleChildScrollView(
-                    child: Container(
-                      child: Column(
-                        children: [
-                          for(var route in selected_route_list)
-                            ListTile(
-                              title: Text(route.route_name, style: TextStyle(color: Colors.white)),
-                              trailing: IconButton(
-                                icon: Icon(
-                                  Icons.delete,
-                                  color: Colors.white,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    selected_route_list.remove(route);
-                                  });
-                                }
-                              ),
-                            )
-                        ],
+                child: Row(
+                  children: [
+                    Text('MRN', style: TextStyle(color: Colors.white)),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: TextFormField(
+                      // onFieldSubmitted: (value) => submitNumber(),
+                        controller: euro_mrn,
+                        decoration: InputDecoration(
+                          errorText: error,
+                          filled: true,
+                          fillColor: Colors.white,
+                          hintText: 'MRN',
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                            borderSide: BorderSide(color: Colors.white)
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                            borderSide: BorderSide(color: Colors.white)
+                          )
+                        ),
                       )
+                    )
+                  ]
+                )
+              ) : Container(),
+              selected_english_messina == "English-channel" && empty_flag == true ? SizedBox(height: 20.0,) : Container(),
+              selected_english_messina == "English-channel" && empty_flag == true ? Container(
+                padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
+                width: getScreen.getWidth(),
+                color: Colors.black.withOpacity(0.8),
+                child: Row(
+                  children: [
+                    FlatButton(
+                      shape: RoundedRectangleBorder(
+                          side: BorderSide(color: Colors.white)),
+                      color: Colors.transparent,
+                      textColor: Colors.white,
+                      padding: EdgeInsets.only(top: 3.0, bottom: 3.0, left: 15.0, right: 15.0),
+                      onPressed: () {
+                        getMRNFilesFromGallery();
+                      },
+                      child: Text(
+                        "Attach File",
+                        style: TextStyle(
+                            fontSize: 20.0,
+                            fontWeight: FontWeight.bold
+                        ),
+                      ),
                     ),
-                  ),
-                ): Container(),
+                    SizedBox(width: 20.0,),
+                    mrn_files.length > 0 ? 
+                    Container(
+                      height: 100,
+                      child: SingleChildScrollView(
+                        child: Container(
+                          child: Column(
+                            children: [
+                              for(var file in mrn_files)
+                                Text(file.name, style:TextStyle(color: Colors.white, fontSize: 20.0)),
+                            ],
+                          )
+                        ),
+                      )
+                    ): Container(child: Text('no file', style:TextStyle(color: Colors.white, fontSize: 20.0)))
+                  ],
+                ),
+              ) : Container(),
+              SizedBox(height: 20.0,),
+              selected_english_messina == "English-channel" && empty_flag == true ? Container(
+                padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
+                width: getScreen.getWidth(),
+                color: Colors.black.withOpacity(0.8),
+                child: Row(
+                  children: [
+                    Text('GRM', style:TextStyle(color: Colors.white)),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: TextFormField(
+                      // onFieldSubmitted: (value) => submitNumber(),
+                        controller: euro_grm,
+                        decoration: InputDecoration(
+                          errorText: error,
+                          filled: true,
+                          fillColor: Colors.white,
+                          hintText: 'GRM',
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                            borderSide: BorderSide(color: Colors.white)
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                            borderSide: BorderSide(color: Colors.white)
+                          )
+                        ),
+                      )
+                    )
+                  ]
+                )
+              ) : Container(),
+              selected_english_messina == "English-channel" && empty_flag == true ? SizedBox(height: 20.0,) : Container(),
+              selected_english_messina == "English-channel" && empty_flag == true ? Container(
+                padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
+                width: getScreen.getWidth(),
+                color: Colors.black.withOpacity(0.8),
+                child: Row(
+                  children: [
+                    FlatButton(
+                      shape: RoundedRectangleBorder(
+                          side: BorderSide(color: Colors.white)),
+                      color: Colors.transparent,
+                      textColor: Colors.white,
+                      padding: EdgeInsets.only(top: 3.0, bottom: 3.0, left: 15.0, right: 15.0),
+                      onPressed: () {
+                        getGRMFilesFromGallery();
+                      },
+                      child: Text(
+                        "Attach File",
+                        style: TextStyle(
+                            fontSize: 20.0,
+                            fontWeight: FontWeight.bold
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 20.0,),
+                    grm_files.length > 0 ? 
+                    Container(
+                      height: 100,
+                      child: SingleChildScrollView(
+                        child: Container(
+                          child: Column(
+                            children: [
+                              for(var file in mrn_files)
+                                Text(file.name, style:TextStyle(color: Colors.white, fontSize: 20.0)),
+                            ],
+                          )
+                        ),
+                      )
+                    ): Container(child: Text('no file', style:TextStyle(color: Colors.white, fontSize: 20.0)))
+                  ],
+                ),
+              ) : Container(),
               SizedBox(height: 20.0,),
               _buildMakeBooking(getScreen),
             ],
@@ -2030,7 +3581,7 @@ class _ServicesViewState extends State<ServicesView> {
       );
     }
     //Trucking
-    if(widget.index==5){
+    if(widget.index==8){
       return SingleChildScrollView(
         padding: EdgeInsets.only(top: (getScreen.getHeight()/2)-30.0),
         child: Container(
@@ -2306,19 +3857,26 @@ class _ServicesViewState extends State<ServicesView> {
                     Container(
                       width: double.infinity,
                       height: 320,
-                      child: ListView.builder(
-                        itemCount: toll_list.length,
-                        itemBuilder: (BuildContext context, int index) {
-                          return new CheckboxListTile(
-                            title: new Text(toll_list[index].name, style: TextStyle(fontSize: 18.0, color: Colors.blueGrey),),
-                            value: toll_list[index].status,
-                            onChanged: (bool value) {
-                              setState(() {
-                                toll_list[index].status = value;
-                              });
-                            },
-                          );
-                        }
+                      child: RawScrollbar(
+                        isAlwaysShown: true,
+                        controller: _scrollController,
+                        thumbColor: Colors.blue,
+                        thickness: 2,
+                        child:ListView.builder(
+                          controller: _scrollController,
+                          itemCount: toll_list.length,
+                          itemBuilder: (BuildContext context, int index) {
+                            return new CheckboxListTile(
+                              title: new Text(toll_list[index].name, style: TextStyle(fontSize: 18.0, color: Colors.blueGrey),),
+                              value: toll_list[index].status,
+                              onChanged: (bool value) {
+                                setState(() {
+                                  toll_list[index].status = value;
+                                });
+                              },
+                            );
+                          }
+                        )
                       ),
                     ):
                     Container(
@@ -2352,56 +3910,71 @@ class _ServicesViewState extends State<ServicesView> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(5)
-                      ),
-                      child: DropdownButton(
-                        isExpanded: true,
-                        focusColor: Colors.white,
-                        dropdownColor: Colors.white,
-                        hint: Text('Please choose a Bridge'),
-                        value: selectedBridge,
-                        onChanged: (newValue) {
-                          setState(() {
-                            selectedBridge = newValue;
-                          });
-                        },
-                        items: bridge_routes.map((bridge) {
-                          return DropdownMenuItem(
-                            child: Container(
-                             child: new Text(bridge.bridge_name),
+                     Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children:[
+                          Text('Bridge', style: TextStyle(color: Colors.white, fontSize: 20)),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(5)
                             ),
-                            value: bridge,
-                          );
-                        }).toList(), 
-                        
+                            child: DropdownButton(
+                              isExpanded: true,
+                              focusColor: Colors.white,
+                              dropdownColor: Colors.white,
+                              hint: Text('Please choose a Bridge'),
+                              value: selectedBridge,
+                              onChanged: (newValue) {
+                                setState(() {
+                                  selectedBridge = newValue;
+                                });
+                              },
+                              items: bridge_routes.map((bridge) {
+                                return DropdownMenuItem(
+                                  child: Container(
+                                  child: new Text(bridge.bridge_name),
+                                  ),
+                                  value: bridge,
+                                );
+                              }).toList(), 
+                              
+                            )
+                          )
+                        ]
                       )
-                    )
                     ),
                     if(selectedBridge != null && selectedBridge.bridge_name == "Other")
                       SizedBox(width: 15.0,),
                     if(selectedBridge != null && selectedBridge.bridge_name == "Other")
                       Expanded(
-                        child: TextField(
-                        // onFieldSubmitted: (value) => submitNumber(),
-                          controller: bridge_other,
-                          decoration: InputDecoration(
-                            errorText: error,
-                            filled: true,
-                            fillColor: Colors.white,
-                            hintText: 'Bridge Other',
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                              borderSide: BorderSide(color: Colors.white)
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                              borderSide: BorderSide(color: Colors.white)
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children:[
+                            Text('Bridge Other', style: TextStyle(color: Colors.white, fontSize: 20)),
+                            Container(
+                              height: 50,
+                              child: TextField(
+                              // onFieldSubmitted: (value) => submitNumber(),
+                                controller: bridge_other,
+                                decoration: InputDecoration(
+                                  errorText: error,
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  hintText: 'Bridge Other',
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                                    borderSide: BorderSide(color: Colors.white)
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                                    borderSide: BorderSide(color: Colors.white)
+                                  )
+                                ),
+                              )
                             )
-                          ),
+                          ]
                         )
                       )
                   ],
@@ -2461,49 +4034,55 @@ class _ServicesViewState extends State<ServicesView> {
                 padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
                 width: getScreen.getWidth(),
                 color: Colors.black.withOpacity(0.8),
-                child: TypeAheadFormField(
-                  textFieldConfiguration: TextFieldConfiguration(
-                    controller: this._typeAheadController,
-                    decoration: InputDecoration(
-                      labelText: 'Registration Number',
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                    textCapitalization: TextCapitalization.characters,
-                    onChanged: (content){
-                      setState(() {
-                        selected_truck_num = content;
-                        veh_length_state = true;
-                        veh_type_state = true;
-                      });
-                    }
-                  ),          
-                  onSuggestionSelected: (suggestion) {
-                    this._typeAheadController.text = suggestion;
-                    selected_truck_num = suggestion;
-                    VehicleModule.changeTruckInfo(UserModule.user.sessId, suggestion).then((json){
-                      setState(() {
-                        changeTruckState(json);
-                      });
-                    });
-                  }, 
-                  itemBuilder: (context, suggestion) {
-                    return ListTile(
-                      title: Text(suggestion),
-                    );
-                  },
-                  suggestionsCallback: (pattern) {
-                    return getSuggestions(pattern);
-                  },
-                  transitionBuilder: (context, suggestionsBox, controller) {
-                    return suggestionsBox;
-                  },
-                  validator: (value) {
-                    if (value.isEmpty) {
-                      return 'Please select a number';
-                    }
-                  },
-                  onSaved: (value) => this._selectedCity = value,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children:[
+                    Text('Registration Number', style: TextStyle(color: Colors.white, fontSize:20)),
+                    TypeAheadFormField(
+                      textFieldConfiguration: TextFieldConfiguration(
+                        controller: this._typeAheadController,
+                        decoration: InputDecoration(
+                          labelText: 'Registration Number',
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                        textCapitalization: TextCapitalization.characters,
+                        onChanged: (content){
+                          setState(() {
+                            selected_truck_num = content;
+                            veh_length_state = true;
+                            veh_type_state = true;
+                          });
+                        }
+                      ),          
+                      onSuggestionSelected: (suggestion) {
+                        this._typeAheadController.text = suggestion;
+                        selected_truck_num = suggestion;
+                        VehicleModule.changeTruckInfo(UserModule.user.sessId, suggestion).then((json){
+                          setState(() {
+                            changeTruckState(json);
+                          });
+                        });
+                      }, 
+                      itemBuilder: (context, suggestion) {
+                        return ListTile(
+                          title: Text(suggestion),
+                        );
+                      },
+                      suggestionsCallback: (pattern) {
+                        return getSuggestions(pattern);
+                      },
+                      transitionBuilder: (context, suggestionsBox, controller) {
+                        return suggestionsBox;
+                      },
+                      validator: (value) {
+                        if (value.isEmpty) {
+                          return 'Please select a number';
+                        }
+                      },
+                      onSaved: (value) => this._selectedCity = value,
+                    )
+                  ]
                 ),
               ),
               SizedBox(height: 20.0,),
@@ -2512,92 +4091,126 @@ class _ServicesViewState extends State<ServicesView> {
                 width: getScreen.getWidth(),
                 color: Colors.black.withOpacity(0.8),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
-                    child: Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(5)
-                      ),
-                      child: DropdownButton(
-                        isExpanded: true,
-                        focusColor: Colors.white,
-                        dropdownColor: Colors.white,
-                        hint: Text('Vehicle Length'),
-                        value: selectedVeh_length,
-                        onChanged: (newValue) {
-                          setState(() {
-                            selectedVeh_length = newValue;
-                          });
-                        },
-                        items: vehicles_length.map((veh_length) {
-                          return DropdownMenuItem(
-                            child: new Text(veh_length),
-                            value: veh_length,
-                          );
-                        }).toList(), 
-                        
-                      )
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Length',
+                          style: TextStyle(
+                            // decoration: TextDecoration.underline,
+                            fontSize: 17.0,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Container(
+                          width: getScreen.getWidth()/2.5,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(5)
+                          ),
+                          child: DropdownButton(
+                            isExpanded: true,
+                            focusColor: Colors.white,
+                            dropdownColor: Colors.white,
+                            hint: Text('Vehicle Length'),
+                            value: selectedVeh_length,
+                            onChanged: (newValue) {
+                              setState(() {
+                                selectedVeh_length = newValue;
+                              });
+                            },
+                            items: vehicles_length.map((veh_length) {
+                              return DropdownMenuItem(
+                                child: new Text(veh_length),
+                                value: veh_length,
+                              );
+                            }).toList(), 
+                            
+                          )
+                        ),
+                      ],
                     ),
+                    SizedBox(width: 50.0,),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Type',
+                          style: TextStyle(
+                            // decoration: TextDecoration.underline,
+                            fontSize: 17.0,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Container(
+                          width: getScreen.getWidth()/2.5,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(5)
+                          ),
+                          child: DropdownButton(
+                            isExpanded: true,
+                            focusColor: Colors.white,
+                            dropdownColor: Colors.white,
+                            hint: Text('Vehicle Type'),
+                            value: selectedVeh_type,
+                            onChanged: (newValue) {
+                              setState(() {
+                                selectedVeh_type = newValue;
+                              });
+                            },
+                            items: vehicles_type.map((type) {
+                              return DropdownMenuItem(
+                                child: new Text(type),
+                                value: type,
+                              );
+                            }).toList(), 
+                            
+                          )
+                        ),
+                      ],
                     ),
-                    SizedBox(width: 15.0,),
-                    Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(5)
-                      ),
-                      child: DropdownButton(
-                        isExpanded: true,
-                        focusColor: Colors.white,
-                        dropdownColor: Colors.white,
-                        hint: Text('Vehicle Type'),
-                        value: selectedVeh_type,
-                        onChanged: (newValue) {
-                          setState(() {
-                            selectedVeh_type = newValue;
-                          });
-                        },
-                        items: vehicles_type.map((type) {
-                          return DropdownMenuItem(
-                            child: new Text(type),
-                            value: type,
-                          );
-                        }).toList(), 
-                        
-                      )
-                    ),
-                    )
-                  ]
+                  ],
                 )
               ),
               SizedBox(height: 20.0,),
               Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(5)
-                ),
-                child: DropdownButton(
-                  focusColor: Colors.white,
-                  dropdownColor: Colors.white,
-                  hint: Text("Vehicle's Manufacturer"),
-                  value: selected_manufacturer,
-                  onChanged: (newValue) {
-                    setState(() {
-                      selected_manufacturer = newValue;
-                    });
-                  },
-                  items: manufacturer_list.map((manufacturer) {
-                    return DropdownMenuItem(
-                      child: Container(
-                        child: new Text(manufacturer.vehicle_manufacturer_name),
+                padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
+                width: getScreen.getWidth(),
+                color: Colors.black.withOpacity(0.8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Vehicle's Manufacturer", style: TextStyle(color: Colors.white, fontSize: 20)),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(5)
                       ),
-                      value: manufacturer,
-                    );
-                  }).toList(), 
-                  
+                      child: DropdownButton(
+                        focusColor: Colors.white,
+                        dropdownColor: Colors.white,
+                        hint: Text("Vehicle's Manufacturer"),
+                        value: selected_manufacturer,
+                        onChanged: (newValue) {
+                          setState(() {
+                            selected_manufacturer = newValue;
+                          });
+                        },
+                        items: manufacturer_list.map((manufacturer) {
+                          return DropdownMenuItem(
+                            child: Container(
+                              child: new Text(manufacturer.vehicle_manufacturer_name),
+                            ),
+                            value: manufacturer,
+                          );
+                        }).toList(), 
+                        
+                      )
+                    )
+                  ]
                 )
               ),
               SizedBox(height: 20.0,),
@@ -2611,43 +4224,55 @@ class _ServicesViewState extends State<ServicesView> {
                     Expanded(
                       child: Container(
                         width: double.infinity,
-                        child: TextField(
-                          controller: vehicle_model,
-                          decoration: InputDecoration(
-                            errorText: error,
-                            filled: true,
-                            fillColor: Colors.white,
-                            hintText: 'Vehicle Model',
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                              borderSide: BorderSide(color: Colors.white)
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                              borderSide: BorderSide(color: Colors.white)
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Vehicle Model', style: TextStyle(color: Colors.white, fontSize:20)),
+                            TextField(
+                              controller: vehicle_model,
+                              decoration: InputDecoration(
+                                errorText: error,
+                                filled: true,
+                                fillColor: Colors.white,
+                                hintText: 'Vehicle Model',
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                                  borderSide: BorderSide(color: Colors.white)
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                                  borderSide: BorderSide(color: Colors.white)
+                                )
+                              ),
                             )
-                          ),
+                          ]
                         )
                       )
                     ),
                     SizedBox(width: 20),
                     Expanded(
-                      child: TextField(
-                        controller: vehicle_color,
-                          decoration: InputDecoration(
-                            errorText: error,
-                            filled: true,
-                            fillColor: Colors.white,
-                            hintText: 'Vehicle Color',
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                              borderSide: BorderSide(color: Colors.white)
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                              borderSide: BorderSide(color: Colors.white)
-                            )
-                          ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children:[
+                          Text('Vehicle Color', style:TextStyle(color: Colors.white, fontSize:20)),
+                          TextField(
+                            controller: vehicle_color,
+                              decoration: InputDecoration(
+                                errorText: error,
+                                filled: true,
+                                fillColor: Colors.white,
+                                hintText: 'Vehicle Color',
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                                  borderSide: BorderSide(color: Colors.white)
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                                  borderSide: BorderSide(color: Colors.white)
+                                )
+                              ),
+                          )
+                        ]
                       )
                     )
                   ],
@@ -2658,90 +4283,108 @@ class _ServicesViewState extends State<ServicesView> {
                 padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
                 width: getScreen.getWidth(),
                 color: Colors.black.withOpacity(0.8),
-                child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(5)
-                    ),
-                    child: DropdownButton(
-                      isExpanded: true,
-                      focusColor: Colors.white,
-                      dropdownColor: Colors.white,
-                      hint: Text("Vehicle's Registration Country"),
-                      value: selected_country,
-                      onChanged: (newValue) {
-                        setState(() {
-                          selected_country = newValue;
-                        });
-                      },
-                      items: country_list.map((country) {
-                        return DropdownMenuItem(
-                          child: Container(
-                            child: new Text(country.country_name),
-                          ),
-                          value: country,
-                        );
-                      }).toList(), 
-                      
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Vehicle's Registration Country", style:TextStyle(color: Colors.white, fontSize:20)),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(5)
+                      ),
+                      child: DropdownButton(
+                        isExpanded: true,
+                        focusColor: Colors.white,
+                        dropdownColor: Colors.white,
+                        hint: Text("Vehicle's Registration Country"),
+                        value: selected_country,
+                        onChanged: (newValue) {
+                          setState(() {
+                            selected_country = newValue;
+                          });
+                        },
+                        items: country_list.map((country) {
+                          return DropdownMenuItem(
+                            child: Container(
+                              child: new Text(country.country_name),
+                            ),
+                            value: country,
+                          );
+                        }).toList(), 
+                        
+                      )
                     )
-                  ),
+                  ]
+                ),
               ),
               SizedBox(height: 20.0,),
               Container(
                 padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
                 width: getScreen.getWidth(),
                 color: Colors.black.withOpacity(0.8),
-                child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(5)
-                    ),
-                    child: DropdownButton(
-                      isExpanded: true,
-                      focusColor: Colors.white,
-                      dropdownColor: Colors.white,
-                      hint: Text('Vehicle Euro Class Rating'),
-                      value: selectedEuroClass,
-                      onChanged: (newValue) {
-                        setState(() {
-                          selectedEuroClass = newValue;
-                        });
-                      },
-                      items: euroclass_routes.map((euro) {
-                        return DropdownMenuItem(
-                          child: Container(
-                            child: new Text(euro),
-                          ),
-                          value: euro,
-                        );
-                      }).toList(), 
-                      
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Vehicle Euro Class Rating', style:TextStyle(color: Colors.white, fontSize:20)),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(5)
+                      ),
+                      child: DropdownButton(
+                        isExpanded: true,
+                        focusColor: Colors.white,
+                        dropdownColor: Colors.white,
+                        hint: Text('Vehicle Euro Class Rating'),
+                        value: selectedEuroClass,
+                        onChanged: (newValue) {
+                          setState(() {
+                            selectedEuroClass = newValue;
+                          });
+                        },
+                        items: euroclass_routes.map((euro) {
+                          return DropdownMenuItem(
+                            child: Container(
+                              child: new Text(euro),
+                            ),
+                            value: euro,
+                          );
+                        }).toList(), 
+                        
+                      )
                     )
-                  ),
+                  ]
+                ),
               ),
               SizedBox(height: 20.0,),
               Container(
                 padding: EdgeInsets.only(top: 10.0, bottom: 10.0, left:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,right:getScreen.getOrientation()== Orientation.portrait?10.0:0.0,),
                 width: getScreen.getWidth(),
                 color: Colors.black.withOpacity(0.8),
-                child: TextFormField(
-                // onFieldSubmitted: (value) => submitNumber(),
-                  controller: euro_notes,
-                  maxLines: 5,
-                  decoration: InputDecoration(
-                    errorText: error,
-                    filled: true,
-                    fillColor: Colors.white,
-                    hintText: 'Notes:',
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                      borderSide: BorderSide(color: Colors.white)
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(5.0)),
-                      borderSide: BorderSide(color: Colors.white)
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Comment', style: TextStyle(color: Colors.white, fontSize:20)),
+                    TextFormField(
+                    // onFieldSubmitted: (value) => submitNumber(),
+                      controller: euro_notes,
+                      maxLines: 5,
+                      decoration: InputDecoration(
+                        errorText: error,
+                        filled: true,
+                        fillColor: Colors.white,
+                        hintText: 'Notes:',
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                          borderSide: BorderSide(color: Colors.white)
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                          borderSide: BorderSide(color: Colors.white)
+                        )
+                      ),
                     )
-                  ),
+                  ]
                 )
               ),
               SizedBox(height: 20.0,),
@@ -2764,73 +4407,78 @@ class _ServicesViewState extends State<ServicesView> {
           Text("Regions", style: TextStyle(color: Colors.white, fontSize: 20.0),),
           SizedBox(width: 20.0,),
           Container(
-            width: 170.0,
-            padding: EdgeInsets.all(10.0),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.withOpacity(0.5)),
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(5),
-                bottom: Radius.circular(5),
-              ),
+            // width: 170.0,
+            // padding: EdgeInsets.all(10.0),
+            child: ferry_region_loading == true ? CircularProgressIndicator()
+              : ferry_region_list.length > 0 ? 
+                Container(
+                  width: getScreen.getWidth()/2.5,
+                  padding: EdgeInsets.all(10.0),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.withOpacity(0.5)),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(5),
+                      bottom: Radius.circular(5),
+                    ),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: new DropdownButton(
+                      hint: new Text("Select Region"),
+                      isExpanded: true,
+                      value: selected_ferry_region,
+                      isDense: true,
+                      onChanged: (newValue) {
+                        setState(() {
+                          selected_ferry_region = newValue;
+                          getFerryFrom(selected_ferry_region);
+                        });
+                      },
+                      items: ferry_region_list.map((region) {
+                        return DropdownMenuItem(
+                          value: region,
+                          child: new Text(region.name,
+                              style: new TextStyle(color: Colors.black)),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ) : Container(child: Text('no region'))           
             ),
-            child: DropdownButtonHideUnderline(
-              child: new DropdownButton<String>(
-                hint: new Text("Select Region"),
-                // value: selectedRegion,
-                value: _region[0].label,
-                isDense: true,
-                isExpanded: true,
-                onChanged: (String newValue) {
-                  setState(() {
-                    selectedRegion = newValue;
-                    _region[0].label;
-                  });
-                  // print(selectedRegion);
-                  print("$TAG select dropdown: ${_region[0].label}");
-                },
-                items: _region.map((Region map) {
-                  return new DropdownMenuItem<String>(
-                    value: map.label,
-                    child: new Text(map.label,
-                        style: new TextStyle(color: Colors.black)),
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
-          // Container(
-          //   width: 170.0,
-          //   height: 30.0,
-          //   child: FlatButton(
-          //     shape: RoundedRectangleBorder(
-          //         borderRadius: BorderRadius.circular(28.0),
-          //         side: BorderSide(color: Colors.white)),
-          //     color: Colors.transparent,
-          //     textColor: Colors.white,
-          //     padding: EdgeInsets.all(2.0),
-          //     onPressed: () {
-          //       print("$TAG Regions: ${listServiceModel[0].title}");
-          //       setState(() {
-          //         if(!isShowFormRegion){
-          //           isShowFormRegion = true;
-          //           return;
-          //         }
-          //         isShowFormRegion = false;
-          //       });
-          //     },
-          //     child: Text(
-          //       "Choose",
-          //       style: TextStyle(
-          //           fontSize: 20.0,
-          //           fontWeight: FontWeight.bold
-          //       ),
-          //     ),
-          //   ),
-          // ),
-        ],
+            
+          ],
       ),
     );
+  }
+  void getFerryFrom(FerryRegion region){
+    ferry_from_loading = true;
+    ferry_from_list = [];
+    FerryModule.getFerryFrom(region.region_id).then((value){
+      if(value.length > 0){
+        for(int i = 0; i < value.length; i++){
+          ferry_from_list.add(value[i]);
+        }
+        selected_ferry_from = null;
+      }
+      setState(() {
+        ferry_from_loading = false;
+      });
+    });
+  }
+  Future<void> getFerryTo(FerryRegion region, FerryFrom ferryFrom) async {
+    ferry_to_loading = true;
+    ferry_to_list = [];
+    await FerryModule.getFerryTo(region.region_id, ferryFrom.port_id).then((value){
+      if(value.length > 0){
+        for(int i = 0; i < value.length; i++){
+          ferry_to_list.add(value[i]);
+        }
+        selected_ferry_to = null;
+      }
+      setState(() {
+        ferry_to_loading = false;
+      });
+    });
   }
 
   Widget _buildFromToFerry(ScreenSize getScreen){
@@ -2855,41 +4503,40 @@ class _ServicesViewState extends State<ServicesView> {
                       color: Colors.white,
                     ),
                   ),
-                  Container(
-                    width: getScreen.getWidth()/2.5,
-                    padding: EdgeInsets.all(10.0),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.withOpacity(0.5)),
-                      color: Colors.white,
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(5),
-                        bottom: Radius.circular(5),
+                  ferry_from_loading == true ? CircularProgressIndicator(valueColor: new AlwaysStoppedAnimation<Color>(Colors.red))
+                    :Container(
+                      width: getScreen.getWidth()/2.5,
+                      padding: EdgeInsets.all(10.0),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.withOpacity(0.5)),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(5),
+                          bottom: Radius.circular(5),
+                        ),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: new DropdownButton(
+                          hint: new Text("Select from"),
+                          isExpanded: true,
+                          value: selected_ferry_from,
+                          isDense: true,
+                          onChanged: (newValue) {
+                            setState(() {
+                              selected_ferry_from = newValue;
+                              getFerryTo(selected_ferry_region, selected_ferry_from);
+                            });
+                          },
+                          items: ferry_from_list.map((from) {
+                            return DropdownMenuItem(
+                              value: from,
+                              child: new Text(from.name,
+                                  style: new TextStyle(color: Colors.black)),
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
-                    child: DropdownButtonHideUnderline(
-                      child: new DropdownButton<String>(
-                        hint: new Text("Select Region"),
-                        isExpanded: true,
-                        value: _region[0].label,
-                        isDense: true,
-                        onChanged: (String newValue) {
-                          setState(() {
-                            selectedRegion = newValue;
-                            _region[0].label;
-                          });
-                          // print(selectedRegion);
-                          print("$TAG select dropdown: ${_region[0].label}");
-                        },
-                        items: _region.map((Region map) {
-                          return new DropdownMenuItem<String>(
-                            value: map.label,
-                            child: new Text(map.label,
-                                style: new TextStyle(color: Colors.black)),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
                 ],
               ),
               SizedBox(width: 25.0,),
@@ -2904,44 +4551,94 @@ class _ServicesViewState extends State<ServicesView> {
                       color: Colors.white,
                     ),
                   ),
-                  Container(
-                    width: getScreen.getWidth()/2.5,
-                    padding: EdgeInsets.all(10.0),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.withOpacity(0.5)),
-                      color: Colors.white,
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(5),
-                        bottom: Radius.circular(5),
+                  ferry_to_loading == true ? CircularProgressIndicator(valueColor: new AlwaysStoppedAnimation<Color>(Colors.red))
+                    :Container(
+                      width: getScreen.getWidth()/2.5,
+                      padding: EdgeInsets.all(10.0),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.withOpacity(0.5)),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(5),
+                          bottom: Radius.circular(5),
+                        ),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: new DropdownButton(
+                          hint: new Text("Select Region"),
+                          isExpanded: true,
+                          value: selected_ferry_to,
+                          isDense: true,
+                          onChanged: (newValue) {
+                            setState(() {
+                              selected_ferry_to = newValue;
+                              
+                            });
+                          },
+                          items: ferry_to_list.map((ferry_to) {
+                            return new DropdownMenuItem(
+                              value: ferry_to,
+                              child: new Text(ferry_to.name,
+                                  style: new TextStyle(color: Colors.black)),
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
-                    child: DropdownButtonHideUnderline(
-                      child: new DropdownButton<String>(
-                        hint: new Text("Select Region"),
-                        isExpanded: true,
-                        value: _region[0].label,
-                        isDense: true,
-                        onChanged: (String newValue) {
-                          setState(() {
-                            selectedRegion = newValue;
-                            _region[0].label;
-                          });
-                          // print(selectedRegion);
-                          print("$TAG select dropdown: ${_region[0].label}");
-                        },
-                        items: _region.map((Region map) {
-                          return new DropdownMenuItem<String>(
-                            value: map.label,
-                            child: new Text(map.label,
-                                style: new TextStyle(color: Colors.black)),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
               ),
             ],
+          ),
+          SizedBox(height: 10.0,),
+          Container(
+            width: MediaQuery.of(context).size.width,
+            child: Row(
+              children: [
+                Container(
+                  width: 150,
+                  child: Text('Date of Service', style: TextStyle(
+                    fontSize: 20.0,
+                    color: Colors.white,
+                  ),),
+                ),
+                SizedBox(width: 5.0,),
+                new IconButton(
+                  icon: Icon(
+                    Icons.calendar_today_outlined,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                  onPressed: () async {
+                    DateTime newDateTime = await showRoundedDatePicker(
+                    context: context,
+                    initialDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
+                    firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
+                    lastDate: DateTime(DateTime.now().year + 1),
+                    onTapDay: (DateTime dateTime, bool available) {
+                      if (!available) {
+                        showDialog(
+                            context: context,
+                            builder: (c) => CupertinoAlertDialog(title: Text("This date cannot be selected."),actions: <Widget>[
+                              CupertinoDialogAction(child: Text("OK"),onPressed: (){
+                                Navigator.pop(context);
+                              },)
+                            ],));
+                      }
+                      return available;
+                    },
+                    borderRadius: 2,
+                    );
+                    if (newDateTime != null) {
+                      setState(() {
+                        ferry_date = newDateTime.year.toString() + "-" + newDateTime.month.toString() + "-" + newDateTime.day.toString();
+                      });
+                    }
+                }),
+                Expanded(
+                  child: Text(ferry_date, style: TextStyle(color: Colors.white, fontSize: 20)),
+                )
+              ]
+            )
           ),
           SizedBox(height: 10.0,),
           //Regis vehicle
@@ -3029,38 +4726,30 @@ class _ServicesViewState extends State<ServicesView> {
                   ),
                   Container(
                     width: getScreen.getWidth()/2.5,
-                    padding: EdgeInsets.all(10.0),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.withOpacity(0.5)),
                       color: Colors.white,
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(5),
-                        bottom: Radius.circular(5),
-                      ),
+                      borderRadius: BorderRadius.circular(5)
                     ),
-                    child: DropdownButtonHideUnderline(
-                      child: new DropdownButton<String>(
-                        hint: new Text("Select Region"),
-                        // value: selectedRegion,
-                        value: _region[0].label,
-                        isDense: true,
-                        onChanged: (String newValue) {
-                          setState(() {
-                            selectedRegion = newValue;
-                            _region[0].label;
-                          });
-                          // print(selectedRegion);
-                          print("$TAG select dropdown: ${_region[0].label}");
-                        },
-                        items: _region.map((Region map) {
-                          return new DropdownMenuItem<String>(
-                            value: map.label,
-                            child: new Text(map.label,
-                                style: new TextStyle(color: Colors.black)),
-                          );
-                        }).toList(),
-                      ),
-                    ),
+                    child: DropdownButton(
+                      isExpanded: true,
+                      focusColor: Colors.white,
+                      dropdownColor: Colors.white,
+                      hint: Text('Vehicle Length'),
+                      value: selectedVeh_length,
+                      // disabledHint: veh_length_state == false ? Text(selectedVeh_length) : null,
+                      onChanged: (newValue) {
+                        setState(() {
+                          selectedVeh_length = newValue;
+                        });
+                      },
+                      items: vehicles_length.map((veh_length) {
+                        return DropdownMenuItem(
+                          child: new Text(veh_length),
+                          value: veh_length,
+                        );
+                      }).toList(), 
+                      
+                    )
                   ),
                 ],
               ),
@@ -3078,38 +4767,30 @@ class _ServicesViewState extends State<ServicesView> {
                   ),
                   Container(
                     width: getScreen.getWidth()/2.5,
-                    padding: EdgeInsets.all(10.0),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.withOpacity(0.5)),
                       color: Colors.white,
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(5),
-                        bottom: Radius.circular(5),
-                      ),
+                      borderRadius: BorderRadius.circular(5)
                     ),
-                    child: DropdownButtonHideUnderline(
-                      child: new DropdownButton<String>(
-                        hint: new Text("Select Region"),
-                        // value: selectedRegion,
-                        value: _region[0].label,
-                        isDense: true,
-                        onChanged: (String newValue) {
-                          setState(() {
-                            selectedRegion = newValue;
-                            _region[0].label;
-                          });
-                          // print(selectedRegion);
-                          print("$TAG select dropdown: ${_region[0].label}");
-                        },
-                        items: _region.map((Region map) {
-                          return new DropdownMenuItem<String>(
-                            value: map.label,
-                            child: new Text(map.label,
-                                style: new TextStyle(color: Colors.black)),
-                          );
-                        }).toList(),
-                      ),
-                    ),
+                    child: DropdownButton(
+                      isExpanded: true,
+                      focusColor: Colors.white,
+                      dropdownColor: Colors.white,
+                      hint: Text('Vehicle Type'),
+                      value: selectedVeh_type,
+                      // disabledHint: veh_type_state == false ? Text(selectedVeh_type) : null,
+                      onChanged: (newValue) {
+                        setState(() {
+                          selectedVeh_type = newValue;
+                        });
+                      },
+                      items: vehicles_type.map((type) {
+                        return DropdownMenuItem(
+                          child: new Text(type),
+                          value: type,
+                        );
+                      }).toList(), 
+                      
+                    )
                   ),
                 ],
               ),
@@ -3118,119 +4799,75 @@ class _ServicesViewState extends State<ServicesView> {
           SizedBox(height: 10.0,),
           //Trailer vehicle
           Container(
-            padding: EdgeInsets.only(left: 0.0, right: 0.0, bottom: 8.0, top: 9.0),
+            width: MediaQuery.of(context).size.width,
             child: Column(
               children: [
-                //Date
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Trailer Registration Number',
-                          style: TextStyle(
-                            // decoration: TextDecoration.underline,
-                            fontSize: 17.0,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Container(
-                          width: ((getScreen.getWidth()/2.5)*2)+50.0,
-                          padding: EdgeInsets.all(10.0),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.withOpacity(0.5)),
-                            color: Colors.white,
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(5),
-                              bottom: Radius.circular(5),
-                            ),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: new DropdownButton<String>(
-                              hint: new Text("Select Date"),
-                              // value: selectedRegion,
-                              value: _region[0].label,
-                              isDense: true,
-                              onChanged: (String newValue) {
-                                setState(() {
-                                  selectedRegion = newValue;
-                                  // _region[0].label;
-                                });
-                                // print(selectedRegion);
-                                print("$TAG select dropdown: ${_region[0].label}");
-                              },
-                              items: _region.map((Region map) {
-                                return new DropdownMenuItem<String>(
-                                  value: map.label,
-                                  child: new Text(map.label,
-                                      style: new TextStyle(color: Colors.black)),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      'Trailer Registration Number',
+                      style: TextStyle(
+                        // decoration: TextDecoration.underline,
+                        fontSize: 17.0,
+                        color: Colors.white,
+                      ),
                     ),
-                    // SizedBox(width: 50.0,),
-                    // Column(
-                    //   crossAxisAlignment: CrossAxisAlignment.start,
-                    //   children: [
-                    //     Text(
-                    //       'Date Services',
-                    //       style: TextStyle(
-                    //         // decoration: TextDecoration.underline,
-                    //         fontSize: 17.0,
-                    //         color: Colors.white,
-                    //       ),
-                    //     ),
-                    //     Container(
-                    //       width: getScreen.getWidth()/2.5,
-                    //       padding: EdgeInsets.all(10.0),
-                    //       decoration: BoxDecoration(
-                    //         border: Border.all(color: Colors.grey.withOpacity(0.5)),
-                    //         color: Colors.white,
-                    //         borderRadius: BorderRadius.vertical(
-                    //           top: Radius.circular(5),
-                    //           bottom: Radius.circular(5),
-                    //         ),
-                    //       ),
-                    //       child: DropdownButtonHideUnderline(
-                    //         child: new DropdownButton<String>(
-                    //           hint: new Text("Select Religion"),
-                    //           // value: selectedRegion,
-                    //           value: _region[0].label,
-                    //           isDense: true,
-                    //           onChanged: (String newValue) {
-                    //             setState(() {
-                    //               selectedRegion = newValue;
-                    //               _region[0].label;
-                    //             });
-                    //             // print(selectedRegion);
-                    //             print("$TAG select dropdown: ${_region[0].label}");
-                    //           },
-                    //           items: _region.map((Region map) {
-                    //             return new DropdownMenuItem<String>(
-                    //               value: map.label,
-                    //               child: new Text(map.label,
-                    //                   style: new TextStyle(color: Colors.black)),
-                    //             );
-                    //           }).toList(),
-                    //         ),
-                    //       ),
-                    //     ),
-                    //   ],
-                    // ),
+                    Container(
+                      child: TypeAheadFormField(
+                        textFieldConfiguration: TextFieldConfiguration(
+                          controller: this.trailerController,
+                          decoration: InputDecoration(
+                            labelText: 'Trailer Registration Number',
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          textCapitalization: TextCapitalization.characters,
+                          onChanged: (content){
+                            setState(() {
+                              selected_trailer_num = content;
+                              trailer_veh_length_state = true;
+                              trailer_veh_type_state = true;
+                            });
+                          }
+                        ),          
+                        onSuggestionSelected: (suggestion) {
+                          this.trailerController.text = suggestion;
+                          selected_trailer_num = suggestion;
+                          VehicleModule.changeTruckInfo(UserModule.user.sessId, suggestion).then((json){
+                            setState(() {
+                              changeTrailerState(json);
+                            });
+                          });
+                        }, 
+                        itemBuilder: (context, suggestion) {
+                          return ListTile(
+                            title: Text(suggestion),
+                          );
+                        },
+                        suggestionsCallback: (pattern) {
+                          return getTrailerSuggestions(pattern);
+                        },
+                        transitionBuilder: (context, suggestionsBox, controller) {
+                          return suggestionsBox;
+                        },
+                        validator: (value) {
+                          if (value.isEmpty) {
+                            return 'Please select a number';
+                          }
+                        },
+                        onSaved: (value) => this._selectedCity = value,
+                      ),
+                    ),
                   ],
                 ),
-                SizedBox(height: 10.0,),
               ],
             ),
           ),
+          SizedBox(height: 10.0,),
           //Length and Type Vehicle
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -3245,38 +4882,30 @@ class _ServicesViewState extends State<ServicesView> {
                   ),
                   Container(
                     width: getScreen.getWidth()/2.5,
-                    padding: EdgeInsets.all(10.0),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.withOpacity(0.5)),
                       color: Colors.white,
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(5),
-                        bottom: Radius.circular(5),
-                      ),
+                      borderRadius: BorderRadius.circular(5)
                     ),
-                    child: DropdownButtonHideUnderline(
-                      child: new DropdownButton<String>(
-                        hint: new Text("Select Region"),
-                        // value: selectedRegion,
-                        value: _region[0].label,
-                        isDense: true,
-                        onChanged: (String newValue) {
-                          setState(() {
-                            selectedRegion = newValue;
-                            _region[0].label;
-                          });
-                          // print(selectedRegion);
-                          print("$TAG select dropdown: ${_region[0].label}");
-                        },
-                        items: _region.map((Region map) {
-                          return new DropdownMenuItem<String>(
-                            value: map.label,
-                            child: new Text(map.label,
-                                style: new TextStyle(color: Colors.black)),
-                          );
-                        }).toList(),
-                      ),
-                    ),
+                    child: DropdownButton(
+                      isExpanded: true,
+                      focusColor: Colors.white,
+                      dropdownColor: Colors.white,
+                      hint: Text('Trailer Vehicle Length'),
+                      value: trailer_selectedVeh_length,
+                      // disabledHint: trailer_veh_length_state == false ? Text(trailer_selectedVeh_length) : null,
+                      onChanged: (newValue) {
+                        setState(() {
+                          trailer_selectedVeh_length = newValue;
+                        });
+                      },
+                      items: vehicles_length.map((veh_length) {
+                        return DropdownMenuItem(
+                          child: new Text(veh_length),
+                          value: veh_length,
+                        );
+                      }).toList(), 
+                      
+                    )
                   ),
                 ],
               ),
@@ -3294,43 +4923,80 @@ class _ServicesViewState extends State<ServicesView> {
                   ),
                   Container(
                     width: getScreen.getWidth()/2.5,
-                    padding: EdgeInsets.all(10.0),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.withOpacity(0.5)),
                       color: Colors.white,
-                      borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(5),
-                        bottom: Radius.circular(5),
-                      ),
+                      borderRadius: BorderRadius.circular(5)
                     ),
-                    child: DropdownButtonHideUnderline(
-                      child: new DropdownButton<String>(
-                        hint: new Text("Select Region"),
-                        // value: selectedRegion,
-                        value: _region[0].label,
-                        isDense: true,
-                        onChanged: (String newValue) {
-                          setState(() {
-                            selectedRegion = newValue;
-                            _region[0].label;
-                          });
-                          // print(selectedRegion);
-                          print("$TAG select dropdown: ${_region[0].label}");
-                        },
-                        items: _region.map((Region map) {
-                          return new DropdownMenuItem<String>(
-                            value: map.label,
-                            child: new Text(map.label,
-                                style: new TextStyle(color: Colors.black)),
-                          );
-                        }).toList(),
-                      ),
-                    ),
+                    child: DropdownButton(
+                      isExpanded: true,
+                      focusColor: Colors.white,
+                      dropdownColor: Colors.white,
+                      hint: Text('Trailer Vehicle Type'),
+                      value: trailer_selectedVeh_type,
+                      // disabledHint: trailer_veh_type_state == false ? Text(trailer_selectedVeh_type) : null,
+                      onChanged: (newValue) {
+                        setState(() {
+                          trailer_selectedVeh_type = newValue;
+                        });
+                      },
+                      items: vehicles_type.map((type) {
+                        return DropdownMenuItem(
+                          child: new Text(type),
+                          value: type,
+                        );
+                      }).toList(), 
+                      
+                    )
                   ),
                 ],
               ),
             ],
           ),
+          SizedBox(height: 10.0,),
+          Container(
+            width: MediaQuery.of(context).size.width,
+            child: offsetPopup(getScreen, widget.index),
+          ),
+          selected_ferry_route_list.length > 0 ? 
+            Container(
+              width: MediaQuery.of(context).size.width,
+              height: 200,
+              child: SingleChildScrollView(
+                child: Container(
+                  child: Column(
+                    children: [
+                      for(var route in selected_ferry_route_list)
+                        ListTile(
+                          title: Column(
+                            children: [
+                              Text(route.route_name, style: TextStyle(color: Colors.white, fontSize: 17)),
+                              Row(
+                                children: [
+                                  Text(route.price, style: TextStyle(color: Colors.white, fontSize: 15)),
+                                  SizedBox(width: 10,),
+                                  Text(route.arrival, style: TextStyle(color: Colors.white, fontSize: 15)),
+                                  SizedBox(width: 10,),
+                                  Text(route.departure, style: TextStyle(color: Colors.white, fontSize: 15)),
+                                ],
+                              )
+                            ],
+                          ),
+                          trailing: IconButton(
+                            icon: Icon(
+                              Icons.delete,
+                              color: Colors.white,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                selected_ferry_route_list.remove(route);
+                              });
+                            }),
+                        )
+                    ],
+                  )
+                ),
+              ),
+            ): Container(),
           SizedBox(height: 10.0,),
           //Desc
           Container(
@@ -3362,32 +5028,32 @@ class _ServicesViewState extends State<ServicesView> {
           ),
           SizedBox(height: 10.0,),
           //View routes
-          Container(
-            width: (getScreen.getWidth())-80,
-            height: 40.0,
-            child: FlatButton(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(0.0),
-                  side: BorderSide(color: Colors.white)),
-              textColor: Colors.white,
-              color: Colors.teal,
-              padding: EdgeInsets.all(8.0),
-              onPressed: () {},
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.not_listed_location_sharp),
-                  SizedBox(width: 8.0,),
-                  Text(
-                    "View Available Routes",
-                    style: TextStyle(
-                      fontSize: 18.0,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          // Container(
+          //   width: (getScreen.getWidth())-80,
+          //   height: 40.0,
+          //   child: FlatButton(
+          //     shape: RoundedRectangleBorder(
+          //         borderRadius: BorderRadius.circular(0.0),
+          //         side: BorderSide(color: Colors.white)),
+          //     textColor: Colors.white,
+          //     color: Colors.teal,
+          //     padding: EdgeInsets.all(8.0),
+          //     onPressed: () {},
+          //     child: Row(
+          //       mainAxisAlignment: MainAxisAlignment.center,
+          //       children: [
+          //         Icon(Icons.not_listed_location_sharp),
+          //         SizedBox(width: 8.0,),
+          //         Text(
+          //           "View Available Routes",
+          //           style: TextStyle(
+          //             fontSize: 18.0,
+          //           ),
+          //         ),
+          //       ],
+          //     ),
+          //   ),
+          // ),
         ],
       )
     );
@@ -3555,6 +5221,78 @@ class _ServicesViewState extends State<ServicesView> {
       ),
     );
   }
+  void getSecondLocation(String first_location) {
+    second_location_list = [];
+    if(first_location == "English-channel"){
+      EnglishMessina eng_messina = EnglishMessina(
+        route_name: "Calais, France – Dover, United Kingdom",
+        fromId: 1000007,
+        toId: 1000011
+      );
+      second_location_list.add(eng_messina);
+      eng_messina = EnglishMessina(
+        route_name: "Dover, United Kingdom - Calais, France",
+        fromId: 1000011,
+        toId: 1000007
+      );
+      second_location_list.add(eng_messina);
+      eng_messina = EnglishMessina(
+        route_name: "Dover, United Kingdom – Dunkerque, France",
+        fromId: 1000011,
+        toId: 1000012
+      );
+      second_location_list.add(eng_messina);
+      eng_messina = EnglishMessina(
+        route_name: "Dunkerque, France - Dover, United Kingdom",
+        fromId: 1000012,
+        toId: 1000011
+      );
+      second_location_list.add(eng_messina);
+      selected_second_location = null;
+    }
+    else{
+      EnglishMessina eng_messina = EnglishMessina(
+        route_name: "Messina – Villa Saint Giovanni",
+        fromId: 1170,
+        toId: 1198
+      );
+      second_location_list.add(eng_messina);
+      eng_messina = EnglishMessina(
+        route_name: "Villa Saint Giovanni - Messina",
+        fromId: 1198,
+        toId: 1170
+      );
+      second_location_list.add(eng_messina);
+      selected_second_location = null;
+    }
+    setState(() {
+      
+    });
+  }
+  Future<void> getMRNFilesFromGallery() async {
+    await FilePicker.platform.pickFiles(allowMultiple: true, allowedExtensions: ['jpg', 'pdf', 'png'], type: FileType.custom).then((value){
+      if(value != null){
+        mrn_files = value.files;
+        // file_name = file.name; //attach_file.substring(attach_file.lastIndexOf('/') + 1, attach_file.lastIndexOf('.') - 1);
+        // file_extension = file.extension; //attach_file.substring(attach_file.lastIndexOf('.') + 1, attach_file.length);
+        // print("------path:${file_extension}");
+        setState(() {
+        });
+      }
+    });
+  }
+  Future<void> getGRMFilesFromGallery() async {
+    await FilePicker.platform.pickFiles(allowMultiple: true, allowedExtensions: ['jpg', 'pdf', 'png'], type: FileType.custom).then((value){
+      if(value != null){
+        grm_files = value.files;
+        // file_name = file.name; //attach_file.substring(attach_file.lastIndexOf('/') + 1, attach_file.lastIndexOf('.') - 1);
+        // file_extension = file.extension; //attach_file.substring(attach_file.lastIndexOf('.') + 1, attach_file.length);
+        // print("------path:${file_extension}");
+        setState(() {
+        });
+      }
+    });
+  }
   void changeVehicleClassType(int id){
     
     if(id == 1){
@@ -3628,7 +5366,8 @@ class _ServicesViewState extends State<ServicesView> {
         "vehicle_euro_type_id": selectedEuro_veh_type.vehicle_euro_type_id,
         "vehicle_euro_type_name": selectedEuro_veh_type.vehicle_euro_type_name,
         "vehicle_euro_type_other": vehicle_class_other.text,
-        "notes": notes.text
+        "notes": notes.text,
+        "order_id": widget.order_detail != null ? widget.order_detail.id_order : null
 
       });
       print("---json data:${json_data}");
@@ -3655,6 +5394,37 @@ class _ServicesViewState extends State<ServicesView> {
       if(selected_route_list.length > 0){
         truck_route = selected_route_list[0];
       }
+      var mrn_list = [];
+      if(mrn_files.length > 0){
+        for(int i = 0; i < mrn_files.length; i++){ 
+          var mrn = {};
+          mrn["code"] = euro_mrn.text;
+          mrn["filename"] = "mrn" + (i + 1).toString() + "." + mrn_files[i].extension;
+          File mrn_file = new File(mrn_files[i].path);
+          List<int> fileBytes = mrn_file.readAsBytesSync();
+          String base64File = base64Encode(fileBytes);
+          mrn["data"] = base64File;
+          mrn_list.add(mrn);
+        }
+        
+      }
+      var grm_list = [];
+      
+      if(grm_files.length > 0){
+        for(int i = 0; i < grm_files.length; i++){ 
+          var grm = {};
+          grm["code"] = euro_grm.text;
+          grm["filename"] = "grm" + (i + 1).toString() + "." + grm_files[i].extension;
+          File grm_file = new File(grm_files[i].path);
+          List<int> fileBytes = grm_file.readAsBytesSync();
+          String base64File = base64Encode(fileBytes);
+          grm["data"] = base64File;
+          grm_list.add(grm);
+        }
+        
+      }
+
+      // print("--- file name:${mrn_list}");
       String json_data = jsonEncode({
         "PHPSESSID" : UserModule.user.sessId,
         "route" : selectedEuroRoute,
@@ -3666,16 +5436,21 @@ class _ServicesViewState extends State<ServicesView> {
         "truck_type_name" : selectedVeh_type,
         "length" : euro_tunnel_meter.text,
         "notes" : euro_notes.text,
-        "route_id" : truck_route.route_id,
-        "interim_route_id" : truck_route.inter_route_id,
-        "company_id" : truck_route.company_id,
-        "company" : truck_route.company,
-        "departure" : truck_route.departure,
-        "arrival" : truck_route.arrival,
-        "description" : truck_route.description,
-        "price" : truck_route.price
+        // "route_id" : truck_route.route_id,
+        // "interim_route_id" : truck_route.inter_route_id,
+        // "company_id" : truck_route.company_id,
+        // "company" : truck_route.company,
+        // "departure" : truck_route.departure,
+        // "arrival" : truck_route.arrival,
+        // "description" : truck_route.description,
+        // "price" : truck_route.price
+        "loaded": empty_flag == true ? 1 : 0,
+        "mrn": mrn_list,
+        "grm": grm_list,
+        "order_id": widget.order_detail != null ? widget.order_detail.id_order : null
 
       });
+      // String output = jsonEncode(mrn_list);
       print("---json data:${json_data}");
       EuroModule.onBooking(json_data).then((value){
         if(value == 200){
@@ -3718,7 +5493,8 @@ class _ServicesViewState extends State<ServicesView> {
         "id_country": selected_country.id_country,
         "country_name": selected_country.country_name,
         "euro_class_rating": selectedEuroClass,
-        "notes": euro_notes.text
+        "notes": euro_notes.text,
+        "order_id": widget.order_detail != null ? widget.order_detail.id_order : null
 
       });
       print("---json data:${json_data}");
@@ -3825,7 +5601,8 @@ class _ServicesViewState extends State<ServicesView> {
         "departure" : truck_route.departure,
         "arrival" : truck_route.arrival,
         "description" : truck_route.description,
-        "price" : truck_route.price
+        "price" : truck_route.price,
+        "order_id": widget.order_detail != null ? widget.order_detail.id_order : null
       });
       print("tunnel_data:----------${json_data}");
       TrainModule.onBooking(json_data).then((value){
@@ -3862,8 +5639,15 @@ class _ServicesViewState extends State<ServicesView> {
         });
       }
     }
+    int order_id = 0;
+    if(widget.order_detail != null){
+      order_id = widget.order_detail.id_order;
+    }
+    else{
+      order_id = null;
+    }
     if(widget.index == 5){
-      await TruckingModule.onBooking(selectedTruckingService.trucking_type_id, other_trucking.text, trucking_date, from_trucking.text, to_trucking.text, comment_trucking.text).then((value){
+      await TruckingModule.onBooking(selectedTruckingService.trucking_type_id, other_trucking.text, trucking_date, from_trucking.text, to_trucking.text, comment_trucking.text, order_id).then((value){
         if(value == "success"){
           Toast.show("Booking Trucking Service", context);
         }
@@ -3882,6 +5666,17 @@ class _ServicesViewState extends State<ServicesView> {
     }
     return suggest_list;
   }
+  List<String> getTrailerSuggestions(String search) {
+    trailer_suggest_list = [];
+    if(VehicleModule.regnum_list.length > 0){
+      for(int i = 0; i < VehicleModule.regnum_list.length; i++){
+        if(VehicleModule.regnum_list[i].truck_num.contains(search)){
+          trailer_suggest_list.add(VehicleModule.regnum_list[i].truck_num);
+        }
+      }
+    }
+    return trailer_suggest_list;
+  }
   void changeTruckState(Map<String, dynamic> json){
     if(VehicleModule.vehLength_list.length > 0){
       for(int i = 0; i < VehicleModule.vehLength_list.length; i++){
@@ -3897,6 +5692,28 @@ class _ServicesViewState extends State<ServicesView> {
         if(json["truck_type_id"] == VehicleModule.vehType_list[i].type){
           selectedVeh_type = VehicleModule.vehType_list[i].name;
           veh_type_state = false;
+          break;
+        }
+      }
+    }
+    euro_tunnel_meter.text = json["truck_length"];
+    
+  }
+  void changeTrailerState(Map<String, dynamic> json){
+    if(VehicleModule.vehLength_list.length > 0){
+      for(int i = 0; i < VehicleModule.vehLength_list.length; i++){
+        if(json["truck_feature_id"] == VehicleModule.vehLength_list[i].truck_feature_id){
+          trailer_selectedVeh_length = VehicleModule.vehLength_list[i].truck_feature_category;
+          trailer_veh_length_state = false;
+          break;
+        }
+      }
+    }
+    if(VehicleModule.vehType_list.length > 0){
+      for(int i = 0; i < VehicleModule.vehType_list.length; i++){
+        if(json["truck_type_id"] == VehicleModule.vehType_list[i].type){
+          trailer_selectedVeh_type = VehicleModule.vehType_list[i].name;
+          trailer_veh_type_state = false;
           break;
         }
       }
@@ -3949,6 +5766,58 @@ class _ServicesViewState extends State<ServicesView> {
     await EuroModule.getRoutes(port_id_from, port_id_to, euro_cross_date, truck_feature_id).then((value){
       print("---available count:${TrainModule.route_list.length}");
     });
+  }
+  Future<void> findFerryRoute() async {
+    if(selected_ferry_from != null){
+      int departure_id = selected_ferry_from.port_id;
+      int arrival = selected_ferry_to.id;
+      String travelDate = ferry_date;
+      int feature_id = 0;
+      for(int i = 0; i < VehicleModule.vehLength_list.length; i++){
+        if(selectedVeh_length == VehicleModule.vehLength_list[i].truck_feature_category){
+          feature_id = VehicleModule.vehLength_list[i].truck_feature_id;
+          break;
+        }
+      }
+      await FerryModule.getFerryRoute(departure_id, arrival, travelDate, feature_id).then((value){
+        print("---available ferry count:${FerryModule.ferry_route_list.length}");
+      });
+    }
+  }
+  Future<void> findLongBridgeRoute() async {
+    int feature_id = 0;
+    for(int i = 0; i < VehicleModule.vehLength_list.length; i++){
+      if(selectedVeh_length == VehicleModule.vehLength_list[i].truck_feature_category){
+        feature_id = VehicleModule.vehLength_list[i].truck_feature_id;
+        break;
+      }
+    }
+    if(selected_longbridge_from == null){
+      await LongBridgeModule.getLongBridgeRoutes(selected_longbridge_from.port_id, selected_longbridge_to.id,longbridge_date1, longbridge_date2, feature_id).then((value){
+
+      });
+    }
+  }
+  Future<void> findEnglishMessinaRoute() async {
+    int feature_id = 0;
+    if(selected_second_location != null){
+      for(int i = 0; i < VehicleModule.vehLength_list.length; i++){
+        if(selectedVeh_length == VehicleModule.vehLength_list[i].truck_feature_category){
+          feature_id = VehicleModule.vehLength_list[i].truck_feature_id;
+          break;
+        }
+      }
+      if(selected_english_messina == "English-channel"){
+        await EnglishMessinaModule.getEnglishRoute(selected_second_location.fromId, selected_second_location.toId, enlgish_messina_date, feature_id).then((value){
+          print("---available english count:${EnglishMessinaModule.english_messina_list.length}");
+        });
+      }
+      else{
+        await EnglishMessinaModule.getMessinaRoute(selected_second_location.fromId, selected_second_location.toId, enlgish_messina_date, feature_id).then((value){
+          print("---available english count:${EnglishMessinaModule.english_messina_list.length}");
+        });
+      }
+    }
   }
 
   Widget offsetPopup(ScreenSize screen, int index) {
@@ -4014,6 +5883,68 @@ class _ServicesViewState extends State<ServicesView> {
           ),
         );
     }
+    if(index == 1){
+      findLongBridgeRoute();
+      return PopupMenuButton<int>(
+        onSelected: (value){
+          setState(() {
+            for(int i = 0; i < LongBridgeModule.route_list.length; i++){
+              if(value == LongBridgeModule.route_list[i].id_route){
+                selected_longbridgeroute_list.add(LongBridgeModule.route_list[i]);
+                break;
+              }
+            }
+          });
+        },
+        itemBuilder: (context) =>[
+          for(var route in LongBridgeModule.route_list)
+            PopupMenuItem(
+              value: route.id_route,
+              child: Container(
+                child: Row(
+                  children: [
+                    Container(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Departure", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),),
+                          Text(route.departure,),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: 5),
+                    Container(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Arrival",  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                          Text(route.arrival),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: 5),
+                    Container(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Price", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                          Text(route.price)
+                        ],
+                      ),
+                    )
+                  ],
+                )
+              )
+            )
+        ],
+        icon: Container(
+            width: double.infinity,
+            height: 40,
+            color: Colors.red,
+            child: new Align(alignment: Alignment.center, child: new Text(LongBridgeModule.route_list != null && LongBridgeModule.route_list.length > 0 ? "AVAILABLE ROUTES" : "UNAVAILABLE ROUTES", style: new TextStyle(fontSize: 16.0, color: Colors.white),),),
+          ),
+        );
+    }
     if(index == 4){
       findEuroTunnelRoute();
       return PopupMenuButton<int>(
@@ -4076,6 +6007,132 @@ class _ServicesViewState extends State<ServicesView> {
           ),
         );
     }
+    if(index == 0){
+      findFerryRoute();
+      return PopupMenuButton<int>(
+        onSelected: (value){
+          setState(() {
+            for(int i = 0; i < FerryModule.ferry_route_list.length; i++){
+              if(value == FerryModule.ferry_route_list[i].id_route){
+                selected_ferry_route_list.add(FerryModule.ferry_route_list[i]);
+                break;
+              }
+            }
+          });
+        },
+        itemBuilder: (context) =>[
+          for(var route in FerryModule.ferry_route_list)
+            PopupMenuItem(
+              value: route.id_route,
+              child: Container(
+                child: Row(
+                  children: [
+                    Container(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Departure", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),),
+                          Text(route.departure,),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: 5),
+                    Container(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Arrival",  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                          Text(route.arrival),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: 5),
+                    Container(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Price", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                          Text(route.price)
+                        ],
+                      ),
+                    )
+                  ],
+                )
+              )
+            )
+        ],
+        icon: Container(
+            width: double.infinity,
+            height: 40,
+            color: Colors.red,
+            child: new Align(alignment: Alignment.center, child: new Text(FerryModule.ferry_route_list != null && FerryModule.ferry_route_list.length > 0 ? "AVAILABLE ROUTES" : "UNAVAILABLE ROUTES", style: new TextStyle(fontSize: 16.0, color: Colors.white),),),
+          ),
+        );
+    }
+    if(index == 5){
+      findEnglishMessinaRoute();
+      return PopupMenuButton<int>(
+        onSelected: (value){
+          setState(() {
+            for(int i = 0; i < EnglishMessinaModule.english_messina_list.length; i++){
+              if(value == EnglishMessinaModule.english_messina_list[i].id_route){
+                selected_messina_route_list.add(EnglishMessinaModule.english_messina_list[i]);
+                print("-----selected_messina_route_list:${selected_messina_route_list.length}");
+                break;
+              }
+            }
+          });
+        },
+        itemBuilder: (context) =>[
+          for(var route in EnglishMessinaModule.english_messina_list)
+            PopupMenuItem(
+              value: route.id_route,
+              child: Container(
+                child: Row(
+                  children: [
+                    Container(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Departure", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),),
+                          Text(route.departure,),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: 5),
+                    Container(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Arrival",  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                          Text(route.arrival),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: 5),
+                    Container(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Price", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                          Text(route.price)
+                        ],
+                      ),
+                    )
+                  ],
+                )
+              )
+            )
+        ],
+        icon: Container(
+            width: double.infinity,
+            height: 40,
+            color: Colors.red,
+            child: new Align(alignment: Alignment.center, child: new Text(EnglishMessinaModule.english_messina_list != null && EnglishMessinaModule.english_messina_list.length > 0 ? "AVAILABLE ROUTES" : "UNAVAILABLE ROUTES", style: new TextStyle(fontSize: 16.0, color: Colors.white),),),
+          ),
+        );
+    }
+    
   }
 }
 

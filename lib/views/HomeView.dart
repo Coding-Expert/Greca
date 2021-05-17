@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:greca/models/OrderDetail.dart';
 import 'package:toast/toast.dart';
 import 'package:greca/models/User.dart';
 import 'package:greca/module/user_module.dart';
@@ -13,10 +14,12 @@ import 'package:greca/views/tabs/home/ProfileView.dart';
 class HomeView extends StatefulWidget {
 
   bool last_order;
+  OrderDetail orderDetail;
 
   HomeView({
     Key key,
-    this.last_order
+    this.last_order,
+    this.orderDetail
   }) : super(key: key);
 
   @override
@@ -27,7 +30,7 @@ class _HomeViewState extends State<HomeView> {
   String TAG = "HomeView ===>";
 
   DateTime currentBackPressTime;
-  int currentTabIndex = 4;
+  int currentTabIndex = 3;
 
   List<Widget> tabs = [];
     // OrdersView(order: widget.last_order),
@@ -43,8 +46,8 @@ class _HomeViewState extends State<HomeView> {
     tabs.add(OrdersView());
     tabs.add(PricesView());
     tabs.add(BalanceView());
-    tabs.add(ProfileView());
-    tabs.add(DashboardView(order: widget.last_order));
+    // tabs.add(ProfileView());
+    tabs.add(DashboardView(orderDetail: widget.orderDetail));
     print("$TAG initState running...");
   }
 
@@ -107,11 +110,11 @@ class _HomeViewState extends State<HomeView> {
               icon: Image.asset("assets/icons/Blanace.png", height: 35.0, width: 35.0,),
               title: Text("Balance", style: TextStyle(fontSize: 14.0),),
             ),
-            BottomNavigationBarItem(
-              backgroundColor: Colors.black,
-              icon: Image.asset("assets/icons/profile.png", height: 35.0, width: 35.0,),
-              title: Text("Profile", style: TextStyle(fontSize: 14.0),),
-            ),
+            // BottomNavigationBarItem(
+            //   backgroundColor: Colors.black,
+            //   icon: Image.asset("assets/icons/profile.png", height: 35.0, width: 35.0,),
+            //   title: Text("Profile", style: TextStyle(fontSize: 14.0),),
+            // ),
             BottomNavigationBarItem(
               backgroundColor: Colors.black,
               icon: Image.asset("assets/icons/Home.png", height:35.0, width: 35.0,),

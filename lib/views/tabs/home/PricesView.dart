@@ -1,9 +1,17 @@
 import 'dart:math';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_rounded_date_picker/rounded_picker.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:greca/helpers/MyProvider.dart';
 import 'package:greca/helpers/ScreenSize.dart';
+import 'package:greca/models/PriceFrom.dart';
+import 'package:greca/models/PriceTo.dart';
+import 'package:greca/models/Prices.dart';
+import 'package:greca/models/VehicleLength.dart';
+import 'package:greca/module/price_module.dart';
+import 'package:greca/module/vehicle_module.dart';
 import 'package:provider/provider.dart';
 import 'package:responsive_table/responsive_table.dart';
 
@@ -78,6 +86,20 @@ class _PricesViewState extends State<PricesView> {
   String _sortColumn;
   bool _sortAscending = true;
   bool _isLoading = true;
+  List<PriceFrom> from_list = [];
+  bool from_flag = false;
+  PriceFrom selected_priceFrom;
+  List<PriceTo> to_list = [];
+  bool to_flag = false;
+  PriceTo selected_priceTo;
+  String service_date;
+  bool vehicles_length_flag = false;
+  List<VehicleLength> vehicles_length = [];
+  VehicleLength selectedVeh_length;
+  List<Prices> specific_price_list = [];
+  bool specific_flag = false;
+  List<Prices> price_list = [];
+
 
   List<Map<String, dynamic>> _generateData({int n: 10}) {
     final List source = List.filled(n, Random.secure());
@@ -113,7 +135,47 @@ class _PricesViewState extends State<PricesView> {
   void initState() {
     super.initState();
     print("$TAG initState runnning...");
+    service_date = DateTime.now().year.toString() + "-" + DateTime.now().month.toString() + "-" + DateTime.now().day.toString();
+    getPriceFrom();
     _initData();
+  }
+  Future<void> getPriceFrom() async {
+    from_flag = true;
+    await PriceModule.getFromList().then((value) async {
+      if(value.length > 0){
+        for(int i = 0; i < value.length; i++){
+          from_list.add(value[i]);
+        }
+      }
+      setState(() {
+        from_flag = false;
+        vehicles_length_flag = true;
+      });
+      await VehicleModule.getVeh_Length().then((value){
+      setState(() {
+        if(VehicleModule.vehLength_list.length > 0){
+          for(int i = 0; i < VehicleModule.vehLength_list.length; i++){
+            vehicles_length.add(VehicleModule.vehLength_list[i]);
+          }
+        }
+        vehicles_length_flag = false;
+      });
+    });
+    });
+  }
+
+  Future<void> getToList(int port_id) async {
+    to_flag = true;
+    await PriceModule.getToList(port_id).then((value){
+      if(value.length > 0){
+        for(int i = 0; i < value.length; i++){
+          to_list.add(value[i]);
+        }
+      }
+      setState(() {
+        to_flag = false;
+      });
+    });
   }
 
   @override
@@ -187,15 +249,46 @@ class _PricesViewState extends State<PricesView> {
             Container(
                 width: screenSize.getWidth(),
                 margin: const EdgeInsets.only(left: 9.0, right: 9.0),
-                padding: const EdgeInsets.all(6.0),
-                decoration: BoxDecoration(border: Border.all(color: Colors.white)),
+                // padding: const EdgeInsets.all(6.0),
+                // decoration: BoxDecoration(border: Border.all(color: Colors.white)),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    Icon(Icons.flag, color: Colors.white,),
+                    Container(
+                      width: 150,
+                      child: Text("From:", style: TextStyle(color: Colors.white, fontSize: 19.0),),
+                    ),
                     SizedBox(width: 8.0,),
-                    Text("From", style: TextStyle(color: Colors.white, fontSize: 19.0),),
+                    from_flag == true ? CircularProgressIndicator()
+                    :Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(5)
+                        ),
+                        child: DropdownButton(
+                          isExpanded: true,
+                          focusColor: Colors.white,
+                          dropdownColor: Colors.white,
+                          hint: Text(''),
+                          value: selected_priceFrom,
+                          onChanged: (newValue) {
+                            setState(() {
+                              selected_priceFrom = newValue;
+                              getToList(selected_priceFrom.port_id);
+                            });
+                          },
+                          items: from_list.map((from) {
+                            return DropdownMenuItem(
+                              child: new Text(from.port_name),
+                              value: from,
+                            );
+                          }).toList(), 
+                          
+                        )
+                      )
+                    )
                   ],
                 )
             ),
@@ -204,15 +297,43 @@ class _PricesViewState extends State<PricesView> {
             Container(
                 width: screenSize.getWidth(),
                 margin: const EdgeInsets.only(left: 9.0, right: 9.0),
-                padding: const EdgeInsets.all(6.0),
-                decoration: BoxDecoration(border: Border.all(color: Colors.white)),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    Icon(Icons.location_on, color: Colors.white,),
+                    Container(
+                      width: 150,
+                      child: Text("To:", style: TextStyle(color: Colors.white, fontSize: 19.0),),
+                    ),
                     SizedBox(width: 8.0,),
-                    Text("To", style: TextStyle(color: Colors.white, fontSize: 19.0),),
+                    to_flag == true ? CircularProgressIndicator()
+                    : Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(5)
+                        ),
+                        child: DropdownButton(
+                          isExpanded: true,
+                          focusColor: Colors.white,
+                          dropdownColor: Colors.white,
+                          hint: Text(''),
+                          value: selected_priceTo,
+                          onChanged: (newValue) {
+                            setState(() {
+                              selected_priceTo = newValue;
+                            });
+                          },
+                          items: to_list.map((to) {
+                            return DropdownMenuItem(
+                              child: new Text(to.name),
+                              value: to,
+                            );
+                          }).toList(), 
+                          
+                        )
+                      )
+                    )
                   ],
                 )
             ),
@@ -221,39 +342,102 @@ class _PricesViewState extends State<PricesView> {
             Container(
                 width: screenSize.getWidth(),
                 margin: const EdgeInsets.only(left: 9.0, right: 9.0),
-                padding: const EdgeInsets.all(6.0),
-                decoration: BoxDecoration(border: Border.all(color: Colors.white)),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    Icon(Icons.home_repair_service_rounded, color: Colors.white,),
+                    Container(
+                      width: 150,
+                      child: Text("Date of Services", style: TextStyle(color: Colors.white, fontSize: 19.0),),
+                    ),
                     SizedBox(width: 8.0,),
-                    Text("Date of Services", style: TextStyle(color: Colors.white, fontSize: 19.0),),
+                    new IconButton(
+                      icon: Icon(
+                        Icons.calendar_today_outlined,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                      onPressed: () async {
+                        DateTime newDateTime = await showRoundedDatePicker(
+                        context: context,
+                        initialDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
+                        firstDate: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
+                        lastDate: DateTime(DateTime.now().year + 1),
+                        onTapDay: (DateTime dateTime, bool available) {
+                          if (!available) {
+                            showDialog(
+                                context: context,
+                                builder: (c) => CupertinoAlertDialog(title: Text("This date cannot be selected."),actions: <Widget>[
+                                  CupertinoDialogAction(child: Text("OK"),onPressed: (){
+                                    Navigator.pop(context);
+                                  },)
+                                ],));
+                          }
+                          return available;
+                        },
+                        borderRadius: 2,
+                        );
+                        if (newDateTime != null) {
+                          setState(() {
+                            service_date = newDateTime.year.toString() + "-" + newDateTime.month.toString() + "-" + newDateTime.day.toString();
+                          });
+                        }
+                    }),
+                    SizedBox(width: 8.0,),
+                    Text(service_date ,style: TextStyle(color: Colors.white, fontSize: 19)),
                   ],
                 )
             ),
             SizedBox(height: 20.0,),
             //length
             Container(
-                width: screenSize.getWidth(),
-                margin: const EdgeInsets.only(left: 9.0, right: 9.0),
-                padding: const EdgeInsets.all(6.0),
-                decoration: BoxDecoration(border: Border.all(color: Colors.white)),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    Icon(Icons.car_repair, color: Colors.white,),
-                    SizedBox(width: 8.0,),
-                    Text("Vehicle Length", style: TextStyle(color: Colors.white, fontSize: 19.0),),
-                  ],
-                )
+              width: screenSize.getWidth(),
+              margin: const EdgeInsets.only(left: 9.0, right: 9.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 150,
+                    child: Text("Vehicle Length", style: TextStyle(color: Colors.white, fontSize: 19.0),),
+                  ),
+                  SizedBox(width: 8.0,),
+                  Expanded(
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(5)
+                      ),
+                      child: DropdownButton(
+                        isExpanded: true,
+                        focusColor: Colors.white,
+                        dropdownColor: Colors.white,
+                        hint: Text('Vehicle Length'),
+                        value: selectedVeh_length,
+                        onChanged: (newValue) {
+                          setState(() {
+                            selectedVeh_length = newValue;
+                          });
+                        },
+                        items: vehicles_length.map((veh_length) {
+                          return DropdownMenuItem(
+                            child: new Text(veh_length.truck_feature_category),
+                            value: veh_length,
+                          );
+                        }).toList(), 
+                        
+                      )
+                    ),
+                  ),
+                ],
+              )
             ),
             SizedBox(height: 50.0,),
             //specific
             Container(
-              width: (screenSize.getWidth())-80,
+              width: screenSize.getWidth(),
+              margin: const EdgeInsets.only(left: 9.0, right: 9.0),
               height: 40.0,
               child: FlatButton(
                 shape: RoundedRectangleBorder(
@@ -262,7 +446,21 @@ class _PricesViewState extends State<PricesView> {
                 textColor: Colors.white,
                 color: Colors.teal,
                 padding: EdgeInsets.all(8.0),
-                onPressed: () {},
+                onPressed: () async {
+                  setState(() {
+                    specific_flag = true;
+                  });
+                  await PriceModule.specificPriceList(selected_priceFrom.port_id , selected_priceTo.id, service_date, selectedVeh_length.truck_feature_id).then((value){
+                    setState(() {
+                      if(value.length > 0){
+                        for(int i = 0; i < value.length; i++){
+                          specific_price_list.add(value[i]);
+                        }
+                      }
+                      specific_flag = false;
+                    });
+                  });
+                },
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -279,9 +477,38 @@ class _PricesViewState extends State<PricesView> {
               ),
             ),
             SizedBox(height: 10.0,),
+            specific_price_list.length > 0 ? 
+            Container(
+              width: screenSize.getWidth(),
+              margin: const EdgeInsets.only(left: 9.0, right: 9.0),
+              height: 200,
+              child: SingleChildScrollView(
+                child: Container(
+                  child: Column(
+                    children: [
+                      for(var price in specific_price_list)
+                        ListTile(
+                          title: Text(price.company + " " + price.price + " " + price.day + " " + price.departure, style: TextStyle(color: Colors.white)),
+                          // trailing: IconButton(
+                          //   icon: Icon(
+                          //     Icons.delete,
+                          //     color: Colors.white,
+                          //   ),
+                          //   onPressed: () {
+                          //     // setState(() {
+                          //       // selected_route_list.remove(route);
+                          //     // });
+                          //   }),
+                        )
+                    ],
+                  )
+                ),
+              ),
+            ): Container(child: Text('no list'),),
             //for all
             Container(
-              width: (screenSize.getWidth())-80,
+              width: screenSize.getWidth(),
+              margin: const EdgeInsets.only(left: 9.0, right: 9.0),
               height: 40.0,
               child: FlatButton(
                 shape: RoundedRectangleBorder(
@@ -290,7 +517,19 @@ class _PricesViewState extends State<PricesView> {
                 textColor: Colors.white,
                 color: Colors.teal,
                 padding: EdgeInsets.all(8.0),
-                onPressed: () {},
+                onPressed: () async {
+                  price_list = [];
+                  await PriceModule.priceList(selected_priceFrom.port_id , selected_priceTo.id, selectedVeh_length.truck_feature_id).then((value){
+                    if(value.length > 0){
+                      for(int i = 0; i < value.length; i++){
+                        price_list.add(value[i]);
+                      }
+                    }
+                    setState(() {
+                      
+                    });
+                  });
+                },
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -307,35 +546,65 @@ class _PricesViewState extends State<PricesView> {
               ),
             ),
             SizedBox(height: 50.0,),
-            //for available
+            price_list.length > 0 ? 
             Container(
-              width: (screenSize.getWidth())-80,
-              height: 40.0,
-              child: FlatButton(
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(0.0),
-                    side: BorderSide(color: Colors.teal)),
-                textColor: Colors.teal,
-                color: Colors.white,
-                padding: EdgeInsets.all(8.0),
-                onPressed: () {
-                  provider.setIsShowPriceView = true;
-                },
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.check_circle),
-                    SizedBox(width: 8.0,),
-                    Text(
-                      "Available Routes",
-                      style: TextStyle(
-                        fontSize: 18.0,
-                      ),
-                    ),
-                  ],
+              width: screenSize.getWidth(),
+              margin: const EdgeInsets.only(left: 9.0, right: 9.0),
+              height: 200,
+              child: SingleChildScrollView(
+                child: Container(
+                  child: Column(
+                    children: [
+                      for(var price in price_list)
+                        GestureDetector(
+                          onTap: (){
+                            provider.detail_price = price;
+                            provider.setIsShowPriceView = true;
+                          },
+                          child: ListTile(
+                            title: Text(price.company + " " + price.price + " " + price.day + " " + price.departure, style: TextStyle(color: Colors.white)),
+                            // trailing: IconButton(
+                            //   icon: Icon(
+                            //     Icons.delete,
+                            //     color: Colors.white,
+                            //   ),
+                            // )
+                          )
+                        )
+                    ],
+                  )
                 ),
               ),
-            ),
+            ): Container(child: Text('no list'),),
+            //for available
+            // Container(
+            //   width: (screenSize.getWidth())-80,
+            //   height: 40.0,
+            //   child: FlatButton(
+            //     shape: RoundedRectangleBorder(
+            //         borderRadius: BorderRadius.circular(0.0),
+            //         side: BorderSide(color: Colors.teal)),
+            //     textColor: Colors.teal,
+            //     color: Colors.white,
+            //     padding: EdgeInsets.all(8.0),
+            //     onPressed: () {
+            //       provider.setIsShowPriceView = true;
+            //     },
+            //     child: Row(
+            //       mainAxisAlignment: MainAxisAlignment.center,
+            //       children: [
+            //         Icon(Icons.check_circle),
+            //         SizedBox(width: 8.0,),
+            //         Text(
+            //           "Available Routes",
+            //           style: TextStyle(
+            //             fontSize: 18.0,
+            //           ),
+            //         ),
+            //       ],
+            //     ),
+            //   ),
+            // ),
           ],
         ),
       ),
@@ -399,7 +668,7 @@ class _PricesViewState extends State<PricesView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text("Shipping Company", style: TextStyle(color: Colors.black, fontSize: 16.0),),
-                        Text("xxxx", style: TextStyle(color: Colors.black, fontSize: 25.0),),
+                        Text(provider.detail_price.company, style: TextStyle(color: Colors.black, fontSize: 25.0),),
                       ],
                     ),
                   ),
@@ -411,7 +680,7 @@ class _PricesViewState extends State<PricesView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text("Day", style: TextStyle(color: Colors.black, fontSize: 16.0),),
-                        Text("xxxx", style: TextStyle(color: Colors.black, fontSize: 25.0),),
+                        Text(provider.detail_price.day, style: TextStyle(color: Colors.black, fontSize: 25.0),),
                       ],
                     ),
                   ),
@@ -423,7 +692,7 @@ class _PricesViewState extends State<PricesView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text("Departure", style: TextStyle(color: Colors.black, fontSize: 16.0),),
-                        Text("xxxx", style: TextStyle(color: Colors.black, fontSize: 25.0),),
+                        Text(provider.detail_price.departure, style: TextStyle(color: Colors.black, fontSize: 25.0),),
                       ],
                     ),
                   ),
@@ -435,7 +704,7 @@ class _PricesViewState extends State<PricesView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text("Arrival", style: TextStyle(color: Colors.black, fontSize: 16.0),),
-                        Text("xxxx", style: TextStyle(color: Colors.black, fontSize: 25.0),),
+                        Text(provider.detail_price.arrival, style: TextStyle(color: Colors.black, fontSize: 25.0),),
                       ],
                     ),
                   ),
@@ -447,7 +716,7 @@ class _PricesViewState extends State<PricesView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text("Descriptions", style: TextStyle(color: Colors.black, fontSize: 16.0),),
-                        Text("xxxx", style: TextStyle(color: Colors.black, fontSize: 25.0),),
+                        Text(provider.detail_price.description, style: TextStyle(color: Colors.black, fontSize: 25.0),),
                       ],
                     ),
                   ),
@@ -459,7 +728,7 @@ class _PricesViewState extends State<PricesView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text("Price", style: TextStyle(color: Colors.black, fontSize: 16.0),),
-                        Text("xxxx", style: TextStyle(color: Colors.black, fontSize: 25.0),),
+                        Text(provider.detail_price.price, style: TextStyle(color: Colors.black, fontSize: 25.0),),
                       ],
                     ),
                   ),

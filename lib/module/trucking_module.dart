@@ -37,7 +37,7 @@ class TruckingModule {
     trucking_list.add(trucking_service);
     return trucking_list;
   }
-  static Future<String> onBooking(int trucking_id, String trucking_other, String trucking_date, String from_location, String to_location, String notes) async {
+  static Future<String> onBooking(int trucking_id, String trucking_other, String trucking_date, String from_location, String to_location, String notes, int order_id) async {
     String result = "";
     var body = jsonEncode({
       "PHPSESSID": UserModule.user.sessId,
@@ -46,7 +46,8 @@ class TruckingModule {
       "traveldate": trucking_date,
       "from_location": from_location,
       "to_location": to_location,
-      "notes": notes
+      "notes": notes,
+      "order_id": order_id
     });
     var response = await http.post(
       "https://www.greca.com.cy/b2b/app/trucking/uploadbooking.php",

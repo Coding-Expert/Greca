@@ -137,9 +137,12 @@ class _BalanceViewState extends State<BalanceView> {
   bool _sortAscending = true;
   bool _isLoading = true;
   bool _showSelect = true;
-  Transaction transaction; 
+  List<Transaction> transaction_list = []; 
+  Transaction current_transaction;
   Charge charge;
   bool trans_loading = false;
+  List<String> year_list = [];
+  String selected_year;
 
   List<Map<String, dynamic>> _generateData({int n: 10}) {
     final List source = List.filled(n, Random.secure());
@@ -185,10 +188,20 @@ class _BalanceViewState extends State<BalanceView> {
     // _initData();
   }
   Future<void> getChargeList() async {
+    transaction_list = [];
     await BalanceModule.getTransaction().then((value){
-      if(value != null){
-        transaction = BalanceModule.transaction;
-        charge = BalanceModule.charge;
+      if(BalanceModule.year_list.length > 0){
+        for(int i = 0; i < BalanceModule.year_list.length; i++){
+          year_list.add(BalanceModule.year_list[i]);
+        }
+        selected_year = year_list[0];
+      }
+      if(value.length > 0){
+        for(int i = 0; i < value.length; i++){
+          transaction_list.add(value[i]);
+        }
+        current_transaction = transaction_list[0];
+        // charge = BalanceModule.charge;
       }
       setState(() {
         trans_loading = false;
@@ -345,28 +358,33 @@ class _BalanceViewState extends State<BalanceView> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    width: 100.0,
+                    width: 130.0,
                     height: 40.0,
-                    child: FlatButton(
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(0.0),
-                          side: BorderSide(color: Colors.white)),
+                    decoration: BoxDecoration(
                       color: Colors.white,
-                      textColor: Colors.white,
-                      padding: EdgeInsets.all(8.0),
-                      onPressed: () {},
-                      child: Center(
-                        child: Text(
-                          "YEAR",
-                          style: TextStyle(
-                              fontSize: 20.0,
-                              color: Colors.lightBlueAccent,
-                              fontWeight: FontWeight.bold
-                          ),
-                        ),
-                      ),
+                      borderRadius: BorderRadius.circular(5)
                     ),
+                    child: DropdownButton(
+                      isExpanded: true,
+                      focusColor: Colors.white,
+                      dropdownColor: Colors.white,
+                      hint: Text('year'),
+                      value: selected_year,
+                      onChanged:(newValue) {
+                        setState(() {
+                          selected_year = newValue;
+                          getTransactionByYear(selected_year);
+                        });
+                      },
+                      items: year_list.map((year) {
+                        return DropdownMenuItem(
+                          child: new Text(year),
+                          value: year,
+                        );
+                      }).toList(), 
+                    )
                   ),
+                  
                   // SizedBox(width: 20.0,),
                   // Text("CUSTOMER", style: TextStyle(fontSize: 20.0, color: Colors.white),),
                 ],
@@ -374,6 +392,7 @@ class _BalanceViewState extends State<BalanceView> {
             ),
             Container(
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   //Based on Transactions
                   Container(
@@ -405,43 +424,52 @@ class _BalanceViewState extends State<BalanceView> {
                     ),
                   ),
                   //Based on Charges
-                  Container(
-                    width: screenSize.getWidth()/2,
-                    height: screenSize.getWidth() > 1000 ? 50.0: 70.0,
-                    child: FlatButton(
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(0.0),
-                          side: BorderSide(color: Colors.white)),
-                      color: Colors.transparent,
-                      textColor: Colors.white,
-                      padding: EdgeInsets.all(8.0),
-                      onPressed: () {
-                        // if(isTransaction){
-                          setState(() {
-                            isTransaction = false;
-                            // return;
-                          });
-                        // }
-                      },
-                      child: Text(
-                        "Based on Charges",
-                        style: TextStyle(
-                          fontSize: isTransaction == false ? 22.0 : 18.0,
-                          color: isTransaction == false ? Colors.white : Colors.white.withOpacity(0.7),
-                        ),
-                      ),
-                    ),
-                  ),
+                  // Container(
+                  //   width: screenSize.getWidth()/2,
+                  //   height: screenSize.getWidth() > 1000 ? 50.0: 70.0,
+                  //   child: FlatButton(
+                  //     shape: RoundedRectangleBorder(
+                  //         borderRadius: BorderRadius.circular(0.0),
+                  //         side: BorderSide(color: Colors.white)),
+                  //     color: Colors.transparent,
+                  //     textColor: Colors.white,
+                  //     padding: EdgeInsets.all(8.0),
+                  //     onPressed: () {
+                  //       // if(isTransaction){
+                  //         setState(() {
+                  //           isTransaction = false;
+                  //           // return;
+                  //         });
+                  //       // }
+                  //     },
+                  //     child: Text(
+                  //       "Based on Charges",
+                  //       style: TextStyle(
+                  //         fontSize: isTransaction == false ? 22.0 : 18.0,
+                  //         color: isTransaction == false ? Colors.white : Colors.white.withOpacity(0.7),
+                  //       ),
+                  //     ),
+                  //   ),
+                  // ),
                 ],
               ),
             ),
+            SizedBox(height: 20.0,),
+            Container(
+              child: Text('Remaining Balance', style:TextStyle(fontSize: 22, color: Colors.white)),
+            ),
+            trans_loading == true ? Container() :
+            Container(
+              child: Text(current_transaction.transactions_total_amount.toString(), style:TextStyle(fontSize: 18, color: Colors.white)),
+            ),
+            
             if(screenSize.getWidth()<750)
               trans_loading == true ? CircularProgressIndicator(
                 valueColor: new AlwaysStoppedAnimation<Color>(Colors.red)
               ) :
               Expanded(
                 child:ListView.builder(
-                    itemCount: isTransaction == true ? transaction.trans_info.length : charge.charge_info.length,
+                    itemCount: isTransaction == true ? current_transaction.trans_info.length : charge.charge_info.length,
                     itemBuilder: (context, index){
                       return _buildList(context, index, screenSize, provider);
                     }
@@ -552,7 +580,7 @@ class _BalanceViewState extends State<BalanceView> {
               onTap: (){
                 provider.isTransShow = isTransaction;
                 if(isTransaction){
-                  provider.seleted_transaction = transaction.trans_info[index];
+                  provider.seleted_transaction = current_transaction.trans_info[index];
                 }
                 else{
                   provider.selected_charge = charge.charge_info[index];
@@ -588,8 +616,16 @@ class _BalanceViewState extends State<BalanceView> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(isTransaction == true ? transaction.trans_info[index].client != null ? transaction.trans_info[index].client : "xxx" : charge.charge_info[index].client != null ? charge.charge_info[index].client : "xxx", style: TextStyle(color: Colors.white, fontSize: 23.0),),
-                        Text(isTransaction == true ? transaction.trans_info[index].ref_number != null ? transaction.trans_info[index].ref_number : "xxx" : charge.charge_info[index].ref_number != null ? charge.charge_info[index].ref_number : "xxx", style: TextStyle(color: Colors.white, fontSize: 16.0),),
+                        Text(isTransaction == true ? current_transaction.trans_info[index].client != null ? current_transaction.trans_info[index].client : "xxx" : charge.charge_info[index].client != null ? charge.charge_info[index].client : "xxx", style: TextStyle(color: Colors.white, fontSize: 23.0),),
+                        Row(
+                          children: [
+                            Text(isTransaction == true ? current_transaction.trans_info[index].credit != null ? current_transaction.trans_info[index].credit : "xxx" : charge.charge_info[index].credit != null ? charge.charge_info[index].credit : "xxx", style: TextStyle(color: Colors.white, fontSize: 16.0),),
+                            SizedBox(width: 10.0,),
+                            Text(current_transaction.trans_info[index].truck!= null ? current_transaction.trans_info[index].truck : "xxx", style: TextStyle(color: Colors.white, fontSize: 16.0),),
+                            
+                          ],
+                        )
+                        
                       ],
                     ),
                   ],
@@ -986,6 +1022,25 @@ class _BalanceViewState extends State<BalanceView> {
         ],
       ),
     );
+  }
+
+  void getTransactionByYear(String year) {
+    
+    setState(() {
+      trans_loading = true;
+      int index = 0;
+      for(int i = 0; i < year_list.length; i++){
+        if(year == year_list[i]){
+          index = i;
+          break;
+        }
+      }
+      current_transaction = transaction_list[index];
+      setState(() {
+        trans_loading = false;
+      });
+    });
+    
   }
 
   void onShare(MyProvider provider) {

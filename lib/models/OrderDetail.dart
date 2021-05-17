@@ -30,10 +30,10 @@ class OrderDetail {
   String trailer;
   int id_trailer;
   int id_trailer_feature;
-  int trailer_feature_category;
+  String trailer_feature_category;
   int id_trailer_type;
-  int trailer_type;
-  int driver;
+  String trailer_type;
+  String driver;
   int id_driver;
   int codriver;
   int id_codriver;

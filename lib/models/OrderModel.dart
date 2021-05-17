@@ -117,4 +117,12 @@ class Order{
     update_date : json["update_date"]
     
   );
+
+  Map<String, dynamic> toJson() => {
+    "order_type": order_type,
+    "id_port_order" : id_port_order,
+    "id_order" : id_order,
+    "order_status": order_status,
+    
+  };
 }

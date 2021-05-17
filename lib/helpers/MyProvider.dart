@@ -3,6 +3,7 @@ import 'package:greca/models/Charge.dart';
 import 'package:greca/models/ChargeInfo.dart';
 import 'package:greca/models/OrderDetail.dart';
 import 'package:greca/models/OrderModel.dart';
+import 'package:greca/models/Prices.dart';
 import 'package:greca/models/TransInfo.dart';
 import 'package:greca/models/Transaction.dart';
 import 'package:greca/module/orders_module.dart';
@@ -17,6 +18,8 @@ class MyProvider with ChangeNotifier{
   TransInfo seleted_transaction;
   ChargeInfo selected_charge;
   bool isTransShow = true;
+  Prices detail_price;
+  bool flag = true;
 
   bool get getIsShowServiceView => _isShowServiceView;
   set setIsShowServiceView(bool value){
