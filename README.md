@@ -20,5 +20,6 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter, view our
 [online documentation](https://flutter.dev/docs), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
-This app was published on PlayStore
+This app was published on PlayStore and AppStore
 https://play.google.com/store/apps/details?id=com.bestcybernetics.greca
+https://apps.apple.com/us/app/greca/id1567892257
